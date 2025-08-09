@@ -14,21 +14,45 @@ class VulkanApp
 
     static constexpr int WINDOW_HEIGHT = 600;
 
-    static constexpr std::array<const char*, 1> VALIDATION_LAYERS = {
+    static constexpr std::array<const char *, 1> VALIDATION_LAYERS = {
         "VK_LAYER_KHRONOS_validation"
     };
+
+    //static methods
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+        void *pUserData
+    );
 
     //private members
     GLFWwindow *m_Window;
 
     VkInstance m_Instance;
 
+    VkDebugUtilsMessengerEXT m_DebugMessenger;
+
     //methods
     void enumerateAvailableExtensions();
 
     bool checkValidationLayerSupport();
 
+    auto getRequiredExtensions();
+
     void createInstance();
+
+    void setupDebugMessenger();
+
+    VkResult createDebugUtilsMessengerEXT(VkInstance instance,
+                                          const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                          const VkAllocationCallbacks *pAllocator,
+                                          VkDebugUtilsMessengerEXT *pDebugMessenger);
+
+    void destroyDebugUtilsMessengerEXT(VkInstance instance,
+                                       VkDebugUtilsMessengerEXT debugMessenger,
+                                       const VkAllocationCallbacks *pAllocator);
+
 public:
     VulkanApp();
 

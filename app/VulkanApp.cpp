@@ -5,6 +5,17 @@
 #include <vector>
 
 
+VkBool32 VulkanApp::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                  VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                  const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                                  void *pUserData)
+{
+    //if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+        std::cout << "Validation layer: " << pCallbackData->pMessage << '\n';
+
+    return VK_FALSE;
+}
+
 void VulkanApp::enumerateAvailableExtensions()
 {
     uint32_t extensionCount = 0;
@@ -48,6 +59,18 @@ bool VulkanApp::checkValidationLayerSupport()
     return true;
 }
 
+auto VulkanApp::getRequiredExtensions()
+{
+    uint32_t glfwExtensionCount = 0;
+    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+    std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+    return extensions;
+}
+
 void VulkanApp::createInstance()
 {
     if (!checkValidationLayerSupport())
@@ -78,20 +101,52 @@ void VulkanApp::createInstance()
     createInfo.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
     createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
 
-    std::vector<const char *> requiredExtensions;
+    auto extensions = getRequiredExtensions();
 
-    for (uint32_t i = 0; i < glfwExtensionCount; i++)
-        requiredExtensions.emplace_back(glfwExtensions[i]);
-
-    requiredExtensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-
-    createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
-    createInfo.ppEnabledExtensionNames = requiredExtensions.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    createInfo.ppEnabledExtensionNames = extensions.data();
 
     if (vkCreateInstance(&createInfo, nullptr, &m_Instance))
         throw std::runtime_error("Failed to create instance");
+}
+
+void VulkanApp::setupDebugMessenger()
+{
+    VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = debugCallback;
+
+    if (createDebugUtilsMessengerEXT(m_Instance, &createInfo, nullptr, &m_DebugMessenger))
+        throw std::runtime_error("Failed to set up debug messenger");
+}
+
+VkResult VulkanApp::createDebugUtilsMessengerEXT(VkInstance instance,
+                                                 const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                                 const VkAllocationCallbacks *pAllocator,
+                                                 VkDebugUtilsMessengerEXT *pDebugMessenger)
+{
+    auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+        vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT"));
+
+    if (func)
+        return func(m_Instance, pCreateInfo, pAllocator, pDebugMessenger);
+
+    return VK_ERROR_EXTENSION_NOT_PRESENT;
+}
+
+void VulkanApp::destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
+                                              const VkAllocationCallbacks *pAllocator)
+{
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)
+            vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func)
+        func(instance, debugMessenger, pAllocator);
 }
 
 VulkanApp::VulkanApp()
@@ -111,6 +166,8 @@ VulkanApp::VulkanApp()
     enumerateAvailableExtensions();
 
     createInstance();
+
+    setupDebugMessenger();
 }
 
 void VulkanApp::run()
@@ -123,6 +180,8 @@ void VulkanApp::run()
 
 VulkanApp::~VulkanApp()
 {
+    destroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
+
     vkDestroyInstance(m_Instance, nullptr);
 
     glfwDestroyWindow(m_Window);
