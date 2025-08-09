@@ -12,9 +12,14 @@ VkBool32 VulkanApp::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message
                                   void *pUserData)
 {
     //if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-        std::cout << "Validation layer: " << pCallbackData->pMessage << '\n';
+    std::cout << "Validation layer: " << pCallbackData->pMessage << '\n';
 
     return VK_FALSE;
+}
+
+bool VulkanApp::QueueFamilyIndices::isComplete()
+{
+    return graphicsFamily.has_value();
 }
 
 void VulkanApp::enumerateAvailableExtensions()
@@ -152,13 +157,9 @@ void VulkanApp::destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsM
 
 bool VulkanApp::isDeviceSuitable(VkPhysicalDevice device)
 {
-    VkPhysicalDeviceProperties deviceProperties;
-    VkPhysicalDeviceFeatures deviceFeatures;
-    vkGetPhysicalDeviceProperties(device, &deviceProperties);
-    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+    QueueFamilyIndices indices = findQueueFamilies(m_PhysicalDevice);
 
-    return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-           deviceFeatures.geometryShader;
+   return indices.isComplete();
 }
 
 int VulkanApp::rateDevice(VkPhysicalDevice device)
@@ -196,16 +197,41 @@ void VulkanApp::pickPhysicalDevice()
 
     std::multimap<int, VkPhysicalDevice> candidates;
 
-    for (const auto& device : devices) {
+    for (const auto &device: devices)
+    {
         int score = rateDevice(device);
         candidates.insert(std::make_pair(score, device));
     }
 
     if (candidates.rbegin()->first > 0)
         m_PhysicalDevice = candidates.rbegin()->second;
-     else
+    else
         throw std::runtime_error("Failed to find a suitable GPU");
+}
 
+VulkanApp::QueueFamilyIndices VulkanApp::findQueueFamilies(VkPhysicalDevice device)
+{
+    QueueFamilyIndices indices;
+
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+    int i = 0;
+    for (const auto &queueFamily: queueFamilies)
+    {
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            indices.graphicsFamily = i;
+
+        if (indices.isComplete())
+            break;
+
+        ++i;
+    }
+
+    return indices;
 }
 
 VulkanApp::VulkanApp()

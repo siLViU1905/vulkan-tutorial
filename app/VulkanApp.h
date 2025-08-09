@@ -1,6 +1,7 @@
 #ifndef VULKANAPP_H
 #define VULKANAPP_H
 #include <array>
+#include <optional>
 #include <string>
 #include <vulkan/vulkan.h>
 
@@ -26,7 +27,13 @@ class VulkanApp
         void *pUserData
     );
 
+    //structs
+    struct QueueFamilyIndices
+    {
+        std::optional<uint32_t> graphicsFamily;
 
+        bool isComplete();
+    };
 
     //private members
     GLFWwindow *m_Window;
@@ -62,6 +69,8 @@ class VulkanApp
     int rateDevice(VkPhysicalDevice device);
 
     void pickPhysicalDevice();
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
 public:
     VulkanApp();
