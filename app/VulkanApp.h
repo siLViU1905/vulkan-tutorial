@@ -44,6 +44,8 @@ class VulkanApp
 
     VkPhysicalDevice m_PhysicalDevice;
 
+    VkDevice m_Device;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -71,6 +73,8 @@ class VulkanApp
     void pickPhysicalDevice();
 
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+
+    void createLogicalDevice();
 
 public:
     VulkanApp();
