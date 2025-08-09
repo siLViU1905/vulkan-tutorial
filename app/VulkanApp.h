@@ -37,6 +37,8 @@ class VulkanApp
     {
         std::optional<uint32_t> graphicsFamily;
 
+        std::optional<uint32_t> presentFamily;
+
         bool isComplete();
     };
 
@@ -54,6 +56,8 @@ class VulkanApp
     VkQueue m_GraphicsQueue;
 
     VkSurfaceKHR m_Surface;
+
+    VkQueue m_PresentQueue;
 
     //methods
     void enumerateAvailableExtensions();
