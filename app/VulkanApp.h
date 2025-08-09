@@ -3,9 +3,14 @@
 #include <array>
 #include <optional>
 #include <string>
-#include <vulkan/vulkan.h>
 
+#define VK_USE_PLATFORM_WIN32_KHR
+#define GLFW_INCLUDE_VULKAN
 #include "../include/GLFW/glfw3.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include "../include/GLFW/glfw3native.h"
+
+#include <vulkan/vulkan.h>
 
 
 class VulkanApp
@@ -48,6 +53,8 @@ class VulkanApp
 
     VkQueue m_GraphicsQueue;
 
+    VkSurfaceKHR m_Surface;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -77,6 +84,8 @@ class VulkanApp
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
     void createLogicalDevice();
+
+    void createSurface();
 
 public:
     VulkanApp();

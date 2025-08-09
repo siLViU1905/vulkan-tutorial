@@ -265,6 +265,18 @@ void VulkanApp::createLogicalDevice()
     vkGetDeviceQueue(m_Device, indices.graphicsFamily.value(), 0, &m_GraphicsQueue);
 }
 
+void VulkanApp::createSurface()
+{
+    VkWin32SurfaceCreateInfoKHR createInfo{};
+
+    createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    createInfo.hwnd = glfwGetWin32Window(m_Window);
+    createInfo.hinstance = GetModuleHandle(nullptr);
+
+    if (vkCreateWin32SurfaceKHR(m_Instance, &createInfo, nullptr, &m_Surface))
+        throw std::runtime_error("Failed to create window surface");
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -288,6 +300,8 @@ VulkanApp::VulkanApp()
     pickPhysicalDevice();
 
     createLogicalDevice();
+
+    createSurface();
 }
 
 void VulkanApp::run()
@@ -303,6 +317,8 @@ VulkanApp::~VulkanApp()
     vkDestroyDevice(m_Device, nullptr);
 
     destroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
+
+    vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
 
     vkDestroyInstance(m_Instance, nullptr);
 
