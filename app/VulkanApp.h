@@ -26,12 +26,16 @@ class VulkanApp
         void *pUserData
     );
 
+
+
     //private members
     GLFWwindow *m_Window;
 
     VkInstance m_Instance;
 
     VkDebugUtilsMessengerEXT m_DebugMessenger;
+
+    VkPhysicalDevice m_PhysicalDevice;
 
     //methods
     void enumerateAvailableExtensions();
@@ -52,6 +56,12 @@ class VulkanApp
     void destroyDebugUtilsMessengerEXT(VkInstance instance,
                                        VkDebugUtilsMessengerEXT debugMessenger,
                                        const VkAllocationCallbacks *pAllocator);
+
+    bool isDeviceSuitable(VkPhysicalDevice device);
+
+    int rateDevice(VkPhysicalDevice device);
+
+    void pickPhysicalDevice();
 
 public:
     VulkanApp();

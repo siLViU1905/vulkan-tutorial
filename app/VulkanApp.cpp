@@ -1,6 +1,7 @@
 #include "VulkanApp.h"
 
 #include <iostream>
+#include <map>
 #include <stdexcept>
 #include <vector>
 
@@ -149,6 +150,64 @@ void VulkanApp::destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsM
         func(instance, debugMessenger, pAllocator);
 }
 
+bool VulkanApp::isDeviceSuitable(VkPhysicalDevice device)
+{
+    VkPhysicalDeviceProperties deviceProperties;
+    VkPhysicalDeviceFeatures deviceFeatures;
+    vkGetPhysicalDeviceProperties(device, &deviceProperties);
+    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+    return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+           deviceFeatures.geometryShader;
+}
+
+int VulkanApp::rateDevice(VkPhysicalDevice device)
+{
+    int score = 0;
+
+    VkPhysicalDeviceProperties deviceProperties;
+    VkPhysicalDeviceFeatures deviceFeatures;
+    vkGetPhysicalDeviceProperties(device, &deviceProperties);
+    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+    if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        score += 1000;
+
+    score += deviceProperties.limits.maxImageDimension2D;
+
+    if (!deviceFeatures.geometryShader)
+        return 0;
+
+    return score;
+}
+
+void VulkanApp::pickPhysicalDevice()
+{
+    m_PhysicalDevice = VK_NULL_HANDLE;
+
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(m_Instance, &deviceCount, nullptr);
+
+    if (!deviceCount)
+        throw std::runtime_error("Failed to find GPUs with Vulkan support");
+
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(m_Instance, &deviceCount, devices.data());
+
+    std::multimap<int, VkPhysicalDevice> candidates;
+
+    for (const auto& device : devices) {
+        int score = rateDevice(device);
+        candidates.insert(std::make_pair(score, device));
+    }
+
+    if (candidates.rbegin()->first > 0)
+        m_PhysicalDevice = candidates.rbegin()->second;
+     else
+        throw std::runtime_error("Failed to find a suitable GPU");
+
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -168,6 +227,8 @@ VulkanApp::VulkanApp()
     createInstance();
 
     setupDebugMessenger();
+
+    pickPhysicalDevice();
 }
 
 void VulkanApp::run()
