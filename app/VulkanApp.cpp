@@ -149,8 +149,8 @@ VkResult VulkanApp::createDebugUtilsMessengerEXT(VkInstance instance,
 void VulkanApp::destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
                                               const VkAllocationCallbacks *pAllocator)
 {
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)
-            vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
     if (func)
         func(instance, debugMessenger, pAllocator);
 }
@@ -159,7 +159,7 @@ bool VulkanApp::isDeviceSuitable(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices = findQueueFamilies(m_PhysicalDevice);
 
-   return indices.isComplete();
+    return indices.isComplete();
 }
 
 int VulkanApp::rateDevice(VkPhysicalDevice device)
@@ -261,6 +261,8 @@ void VulkanApp::createLogicalDevice()
 
     if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device))
         throw std::runtime_error("Failed to create logical device");
+
+    vkGetDeviceQueue(m_Device, indices.graphicsFamily.value(), 0, &m_GraphicsQueue);
 }
 
 VulkanApp::VulkanApp()

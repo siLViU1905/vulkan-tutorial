@@ -46,6 +46,8 @@ class VulkanApp
 
     VkDevice m_Device;
 
+    VkQueue m_GraphicsQueue;
+
     //methods
     void enumerateAvailableExtensions();
 
