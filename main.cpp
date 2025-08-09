@@ -13,6 +13,7 @@ int main()
   try
   {
     app = std::make_unique<VulkanApp>();
+    app->run();
   }
   catch (const std::exception& e)
   {
