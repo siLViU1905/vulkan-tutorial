@@ -284,6 +284,8 @@ VulkanApp::VulkanApp()
     setupDebugMessenger();
 
     pickPhysicalDevice();
+
+    createLogicalDevice();
 }
 
 void VulkanApp::run()
