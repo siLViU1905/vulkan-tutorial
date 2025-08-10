@@ -154,6 +154,8 @@ class VulkanApp
 
     void createCommandBuffer();
 
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+
 public:
     VulkanApp();
 

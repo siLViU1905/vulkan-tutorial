@@ -773,6 +773,61 @@ void VulkanApp::createCommandBuffer()
         throw std::runtime_error("Failed to allocate command buffers");
 }
 
+void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
+{
+    VkCommandBufferBeginInfo beginInfo{};
+
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = nullptr;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo))
+        throw std::runtime_error("Failed to begin recording command buffer");
+
+    VkRenderPassBeginInfo renderPassInfo{};
+
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = m_RenderPass;
+    renderPassInfo.framebuffer = m_SwapChainFramebuffers[imageIndex];
+
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = m_SwapChainExtent;
+
+    VkClearValue clearColor = {{{0.f, 0.f, 0.f, 1.f}}};
+
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(m_CommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
+
+    VkViewport viewport{};
+
+    viewport.x = 0.f;
+    viewport.y = 0.f;
+    viewport.width = static_cast<float>(m_SwapChainExtent.width);
+    viewport.height = static_cast<float>(m_SwapChainExtent.height);
+    viewport.minDepth = 0.f;
+    viewport.maxDepth = 1.f;
+
+    vkCmdSetViewport(m_CommandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+
+    scissor.offset = {0, 0};
+    scissor.extent = m_SwapChainExtent;
+
+    vkCmdSetScissor(m_CommandBuffer, 0, 1, &scissor);
+
+    vkCmdDraw(m_CommandBuffer, 3,1,0,0);
+
+    vkCmdEndRenderPass(m_CommandBuffer);
+
+    if (vkEndCommandBuffer(m_CommandBuffer))
+        throw std::runtime_error("Failed to record command buffer");
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
