@@ -84,6 +84,8 @@ class VulkanApp
 
     std::vector<VkImageView> m_SwapChainImageViews;
 
+    VkRenderPass m_RenderPass;
+
     VkPipelineLayout m_PipelineLayout;
 
     //methods
@@ -135,6 +137,8 @@ class VulkanApp
     void createGraphicsPipeline();
 
     VkShaderModule createShaderModule(const std::vector<char>& code);
+
+    void createRenderPass();
 
 public:
     VulkanApp();
