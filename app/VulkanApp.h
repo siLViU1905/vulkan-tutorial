@@ -90,7 +90,7 @@ class VulkanApp
 
     VkPipeline m_GraphicsPipeline;
 
-
+    std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 
     //methods
     void enumerateAvailableExtensions();
@@ -143,6 +143,8 @@ class VulkanApp
     VkShaderModule createShaderModule(const std::vector<char>& code);
 
     void createRenderPass();
+
+    void createFramebuffers();
 
 public:
     VulkanApp();

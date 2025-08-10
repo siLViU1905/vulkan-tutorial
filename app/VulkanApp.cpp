@@ -723,6 +723,29 @@ void VulkanApp::createRenderPass()
         throw std::runtime_error("Failed to create render pass");
 }
 
+void VulkanApp::createFramebuffers()
+{
+    m_SwapChainFramebuffers.resize(m_SwapChainImageViews.size());
+
+    for (size_t i =0;i<m_SwapChainImageViews.size();++i)
+    {
+        VkImageView attachments[] = {m_SwapChainImageViews[i]};
+
+        VkFramebufferCreateInfo framebufferInfo{};
+
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = m_RenderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = m_SwapChainExtent.width;
+        framebufferInfo.height = m_SwapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(m_Device, &framebufferInfo, nullptr, &m_SwapChainFramebuffers[i]))
+            throw std::runtime_error("Failed to create framebuffer");
+    }
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -756,6 +779,8 @@ VulkanApp::VulkanApp()
     createRenderPass();
 
     createGraphicsPipeline();
+
+    createFramebuffers();
 }
 
 void VulkanApp::run()
@@ -768,6 +793,9 @@ void VulkanApp::run()
 
 VulkanApp::~VulkanApp()
 {
+    for (auto& framebuffer : m_SwapChainFramebuffers)
+        vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
+
     vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
 
     vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
