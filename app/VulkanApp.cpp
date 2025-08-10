@@ -608,13 +608,8 @@ void VulkanApp::createGraphicsPipeline()
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 
-    colorBlendAttachment.blendEnable = VK_TRUE;
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
 
@@ -713,14 +708,6 @@ void VulkanApp::createRenderPass()
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
-    VkRenderPassCreateInfo renderPassInfo{};
-
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-
     VkSubpassDependency dependency{};
 
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -731,6 +718,14 @@ void VulkanApp::createRenderPass()
 
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo renderPassInfo{};
+
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
 
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
@@ -785,7 +780,7 @@ void VulkanApp::createCommandBuffers()
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = m_CommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size());
+    allocInfo.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
 
     if (vkAllocateCommandBuffers(m_Device, &allocInfo, m_CommandBuffers.data()))
         throw std::runtime_error("Failed to allocate command buffers");
@@ -850,11 +845,13 @@ void VulkanApp::drawFrame()
 {
     vkWaitForFences(m_Device, 1, &m_InFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
-    vkResetFences(m_Device, 1, &m_InFlightFences[currentFrame]);
-
     uint32_t imageIndex;
 
-    vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX, m_ImageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX, m_ImageAvailableSemaphores[currentFrame], VK_NULL_HANDLE,
+                          &imageIndex);
+
+
+    vkResetFences(m_Device, 1, &m_InFlightFences[currentFrame]);
 
     vkResetCommandBuffer(m_CommandBuffers[currentFrame], 0);
 
@@ -888,7 +885,7 @@ void VulkanApp::drawFrame()
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
+    presentInfo.pWaitSemaphores = waitSemaphores;
 
     VkSwapchainKHR swapChains[] = {m_SwapChain};
 
@@ -977,11 +974,13 @@ void VulkanApp::run()
 
         glfwPollEvents();
     }
+
+    vkDeviceWaitIdle(m_Device);
 }
 
 VulkanApp::~VulkanApp()
 {
-    vkDeviceWaitIdle(m_Device);
+
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
