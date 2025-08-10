@@ -80,6 +80,8 @@ class VulkanApp
 
     VkExtent2D m_SwapChainExtent;
 
+    std::vector<VkImageView> m_SwapChainImageViews;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -123,6 +125,10 @@ class VulkanApp
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
     void createSwapChain();
+
+    void createImageViews();
+
+
 
 public:
     VulkanApp();
