@@ -32,6 +32,8 @@ class VulkanApp
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
+    inline static bool WINDOW_RESIZED = false;
+
     //static methods
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -41,6 +43,8 @@ class VulkanApp
     );
 
     static auto readFile(const std::string& path);
+
+    static void framebufferCallback(GLFWwindow* window, int width, int height);
 
     //structs
     struct QueueFamilyIndices
@@ -169,6 +173,10 @@ class VulkanApp
     void drawFrame();
 
     void createSyncObjects();
+
+    void cleanupSwapChain();
+
+    void recreateSwapChain();
 
 public:
     VulkanApp();

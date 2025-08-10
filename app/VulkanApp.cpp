@@ -39,6 +39,11 @@ auto VulkanApp::readFile(const std::string &path)
     return buffer;
 }
 
+void VulkanApp::framebufferCallback(GLFWwindow *window, int width, int height)
+{
+    WINDOW_RESIZED = true;
+}
+
 bool VulkanApp::QueueFamilyIndices::isComplete()
 {
     return graphicsFamily.has_value() && presentFamily.has_value();
@@ -608,7 +613,8 @@ void VulkanApp::createGraphicsPipeline()
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT
+                                          | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
@@ -847,8 +853,16 @@ void VulkanApp::drawFrame()
 
     uint32_t imageIndex;
 
-    vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX, m_ImageAvailableSemaphores[currentFrame], VK_NULL_HANDLE,
-                          &imageIndex);
+    auto result = vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX, m_ImageAvailableSemaphores[currentFrame],
+                                        VK_NULL_HANDLE,
+                                        &imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        recreateSwapChain();
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        throw std::runtime_error("Failed to acquire swap chain image");
 
 
     vkResetFences(m_Device, 1, &m_InFlightFences[currentFrame]);
@@ -893,7 +907,13 @@ void VulkanApp::drawFrame()
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
 
-    vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+    result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+        recreateSwapChain();
+    else if (result != VK_SUCCESS)
+        throw std::runtime_error("Failed to present swap chain image");
+
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
@@ -921,6 +941,40 @@ void VulkanApp::createSyncObjects()
             throw std::runtime_error("Failed to create semaphores");
 }
 
+void VulkanApp::cleanupSwapChain()
+{
+    for (auto &framebuffer: m_SwapChainFramebuffers)
+    {
+        vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
+    }
+
+    for (auto &imageView: m_SwapChainImageViews)
+    {
+        vkDestroyImageView(m_Device, imageView, nullptr);
+    }
+
+    vkDestroySwapchainKHR(m_Device, m_SwapChain, nullptr);
+}
+
+void VulkanApp::recreateSwapChain()
+{
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(m_Window, &width, &height);
+    while (width == 0 || height == 0)
+    {
+        glfwGetFramebufferSize(m_Window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(m_Device);
+
+    cleanupSwapChain();
+
+    createSwapChain();
+    createImageViews();
+    createFramebuffers();
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -928,14 +982,14 @@ VulkanApp::VulkanApp()
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
     m_Window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan App", nullptr, nullptr);
 
     if (!m_Window)
         throw std::runtime_error("Window initialization failed");
 
     currentFrame = 0;
+
+    glfwSetFramebufferSizeCallback(m_Window, framebufferCallback);
 
     enumerateAvailableExtensions();
 
@@ -980,8 +1034,6 @@ void VulkanApp::run()
 
 VulkanApp::~VulkanApp()
 {
-
-
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
         vkDestroySemaphore(m_Device, m_ImageAvailableSemaphores[i], nullptr);
