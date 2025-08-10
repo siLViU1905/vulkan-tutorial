@@ -595,6 +595,15 @@ void VulkanApp::createGraphicsPipeline()
     rasterizer.depthBiasClamp = 0.0f;
     rasterizer.depthBiasSlopeFactor = 0.0f;
 
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.minSampleShading = 1.0f;
+    multisampling.pSampleMask = nullptr;
+    multisampling.alphaToCoverageEnable = VK_FALSE;
+    multisampling.alphaToOneEnable = VK_FALSE;
+
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 
     colorBlendAttachment.blendEnable = VK_TRUE;
@@ -627,6 +636,32 @@ void VulkanApp::createGraphicsPipeline()
 
     if (vkCreatePipelineLayout(m_Device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout))
         throw std::runtime_error("Failed to create pipeline layout");
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = nullptr;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+
+    pipelineInfo.layout = m_PipelineLayout;
+
+    pipelineInfo.renderPass = m_RenderPass;
+    pipelineInfo.subpass = 0;
+
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    if (vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_GraphicsPipeline))
+        throw std::runtime_error("Failed to create graphics pipeline");
 
     vkDestroyShaderModule(m_Device, fragShaderModule, nullptr);
     vkDestroyShaderModule(m_Device, vertShaderModule, nullptr);
@@ -673,7 +708,7 @@ void VulkanApp::createRenderPass()
 
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-    subpass.colorAttachmentCount = 3;
+    subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments= &colorAttachmentRef;
 
     VkRenderPassCreateInfo renderPassInfo{};
@@ -733,6 +768,8 @@ void VulkanApp::run()
 
 VulkanApp::~VulkanApp()
 {
+    vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
+
     vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
 
     vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);

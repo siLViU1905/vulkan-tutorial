@@ -88,6 +88,10 @@ class VulkanApp
 
     VkPipelineLayout m_PipelineLayout;
 
+    VkPipeline m_GraphicsPipeline;
+
+
+
     //methods
     void enumerateAvailableExtensions();
 
