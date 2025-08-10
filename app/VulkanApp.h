@@ -38,6 +38,8 @@ class VulkanApp
         void *pUserData
     );
 
+    static auto readFile(const std::string& path);
+
     //structs
     struct QueueFamilyIndices
     {
@@ -81,6 +83,8 @@ class VulkanApp
     VkExtent2D m_SwapChainExtent;
 
     std::vector<VkImageView> m_SwapChainImageViews;
+
+    VkPipelineLayout m_PipelineLayout;
 
     //methods
     void enumerateAvailableExtensions();
@@ -128,7 +132,9 @@ class VulkanApp
 
     void createImageViews();
 
+    void createGraphicsPipeline();
 
+    VkShaderModule createShaderModule(const std::vector<char>& code);
 
 public:
     VulkanApp();
