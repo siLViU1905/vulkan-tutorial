@@ -319,6 +319,8 @@ void VulkanApp::createLogicalDevice()
     if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device))
         throw std::runtime_error("Failed to create logical device");
 
+    vkGetDeviceQueue(m_Device, indices.graphicsFamily.value(), 0, &m_GraphicsQueue);
+
     vkGetDeviceQueue(m_Device, indices.presentFamily.value(), 0, &m_PresentQueue);
 }
 
@@ -380,7 +382,7 @@ VulkanApp::SwapChainSupportDetails VulkanApp::querySwapChainSupport(VkPhysicalDe
 VkSurfaceFormatKHR VulkanApp::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats)
 {
     for (const auto &availableFormat: availableFormats)
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace ==
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace ==
             VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
             return availableFormat;
 
@@ -719,6 +721,20 @@ void VulkanApp::createRenderPass()
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
 
+    VkSubpassDependency dependency{};
+
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
     if (vkCreateRenderPass(m_Device, &renderPassInfo, nullptr, &m_RenderPass))
         throw std::runtime_error("Failed to create render pass");
 }
@@ -760,16 +776,18 @@ void VulkanApp::createCommandPool()
         throw std::runtime_error("Failed to create command pool");
 }
 
-void VulkanApp::createCommandBuffer()
+void VulkanApp::createCommandBuffers()
 {
+    m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
     VkCommandBufferAllocateInfo allocInfo{};
 
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = m_CommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
+    allocInfo.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size());
 
-    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_CommandBuffer))
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, m_CommandBuffers.data()))
         throw std::runtime_error("Failed to allocate command buffers");
 }
 
@@ -798,9 +816,9 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
 
-    vkCmdBeginRenderPass(m_CommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
 
     VkViewport viewport{};
 
@@ -811,32 +829,84 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
     viewport.minDepth = 0.f;
     viewport.maxDepth = 1.f;
 
-    vkCmdSetViewport(m_CommandBuffer, 0, 1, &viewport);
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     VkRect2D scissor{};
 
     scissor.offset = {0, 0};
     scissor.extent = m_SwapChainExtent;
 
-    vkCmdSetScissor(m_CommandBuffer, 0, 1, &scissor);
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdDraw(m_CommandBuffer, 3,1,0,0);
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
-    vkCmdEndRenderPass(m_CommandBuffer);
+    vkCmdEndRenderPass(commandBuffer);
 
-    if (vkEndCommandBuffer(m_CommandBuffer))
+    if (vkEndCommandBuffer(commandBuffer))
         throw std::runtime_error("Failed to record command buffer");
 }
 
 void VulkanApp::drawFrame()
 {
-    vkWaitForFences(m_Device, 1, &m_InFlightFence, VK_TRUE, UINT64_MAX);
+    vkWaitForFences(m_Device, 1, &m_InFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
-    vkResetFences(m_Device, 1, &m_InFlightFence);
+    vkResetFences(m_Device, 1, &m_InFlightFences[currentFrame]);
+
+    uint32_t imageIndex;
+
+    vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX, m_ImageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+    vkResetCommandBuffer(m_CommandBuffers[currentFrame], 0);
+
+    recordCommandBuffer(m_CommandBuffers[currentFrame], imageIndex);
+
+    VkSubmitInfo submitInfo{};
+
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {m_ImageAvailableSemaphores[currentFrame]};
+
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_CommandBuffers[currentFrame];
+
+    VkSemaphore signalSemaphores[] = {m_RenderFinishedSemaphores[currentFrame]};
+
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, m_InFlightFences[currentFrame]))
+        throw std::runtime_error("Failed to submit draw command buffer");
+
+    VkPresentInfoKHR presentInfo{};
+
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {m_SwapChain};
+
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void VulkanApp::createSyncObjects()
 {
+    m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
     VkSemaphoreCreateInfo semaphoreInfo{};
 
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -846,11 +916,12 @@ void VulkanApp::createSyncObjects()
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_ImageAvailableSemaphore) ||
-        vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphore) ||
-        vkCreateFence(m_Device, &fenceInfo, nullptr, &m_InFlightFence)
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]) ||
+            vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) ||
+            vkCreateFence(m_Device, &fenceInfo, nullptr, &m_InFlightFences[i])
         )
-        throw std::runtime_error("Failed to create semaphores");
+            throw std::runtime_error("Failed to create semaphores");
 }
 
 VulkanApp::VulkanApp()
@@ -867,13 +938,15 @@ VulkanApp::VulkanApp()
     if (!m_Window)
         throw std::runtime_error("Window initialization failed");
 
+    currentFrame = 0;
+
     enumerateAvailableExtensions();
 
     createInstance();
 
-    createSurface();
-
     setupDebugMessenger();
+
+    createSurface();
 
     pickPhysicalDevice();
 
@@ -891,7 +964,7 @@ VulkanApp::VulkanApp()
 
     createCommandPool();
 
-    createCommandBuffer();
+    createCommandBuffers();
 
     createSyncObjects();
 }
@@ -908,11 +981,16 @@ void VulkanApp::run()
 
 VulkanApp::~VulkanApp()
 {
-    vkDestroySemaphore(m_Device, m_ImageAvailableSemaphore, nullptr);
+    vkDeviceWaitIdle(m_Device);
 
-    vkDestroySemaphore(m_Device, m_RenderFinishedSemaphore, nullptr);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        vkDestroySemaphore(m_Device, m_ImageAvailableSemaphores[i], nullptr);
 
-    vkDestroyFence(m_Device, m_InFlightFence, nullptr);
+        vkDestroySemaphore(m_Device, m_RenderFinishedSemaphores[i], nullptr);
+
+        vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
+    }
 
     vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 

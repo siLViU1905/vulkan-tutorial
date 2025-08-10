@@ -22,6 +22,8 @@ class VulkanApp
 
     static constexpr int WINDOW_HEIGHT = 600;
 
+    static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
+
     static constexpr std::array<const char *, 1> VALIDATION_LAYERS = {
         "VK_LAYER_KHRONOS_validation"
     };
@@ -94,13 +96,15 @@ class VulkanApp
 
     VkCommandPool m_CommandPool;
 
-    VkCommandBuffer m_CommandBuffer;
+    std::vector<VkCommandBuffer> m_CommandBuffers;
 
-    VkSemaphore m_ImageAvailableSemaphore;
+    std::vector<VkSemaphore> m_ImageAvailableSemaphores;
 
-    VkSemaphore m_RenderFinishedSemaphore;
+    std::vector<VkSemaphore> m_RenderFinishedSemaphores;
 
-    VkFence m_InFlightFence;
+    std::vector<VkFence> m_InFlightFences;
+
+    uint32_t currentFrame;
 
     //methods
     void enumerateAvailableExtensions();
@@ -158,7 +162,7 @@ class VulkanApp
 
     void createCommandPool();
 
-    void createCommandBuffer();
+    void createCommandBuffers();
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
