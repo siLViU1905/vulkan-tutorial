@@ -746,6 +746,20 @@ void VulkanApp::createFramebuffers()
     }
 }
 
+void VulkanApp::createCommandPool()
+{
+    auto queueFamilyIndices = findQueueFamilies(m_PhysicalDevice);
+
+    VkCommandPoolCreateInfo poolInfo{};
+
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+    if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool))
+        throw std::runtime_error("Failed to create command pool");
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -781,6 +795,8 @@ VulkanApp::VulkanApp()
     createGraphicsPipeline();
 
     createFramebuffers();
+
+    createCommandPool();
 }
 
 void VulkanApp::run()
@@ -793,6 +809,8 @@ void VulkanApp::run()
 
 VulkanApp::~VulkanApp()
 {
+   vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
+
     for (auto& framebuffer : m_SwapChainFramebuffers)
         vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
 

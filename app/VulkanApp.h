@@ -92,6 +92,8 @@ class VulkanApp
 
     std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 
+    VkCommandPool m_CommandPool;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -145,6 +147,8 @@ class VulkanApp
     void createRenderPass();
 
     void createFramebuffers();
+
+    void createCommandPool();
 
 public:
     VulkanApp();
