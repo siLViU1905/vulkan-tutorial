@@ -96,6 +96,12 @@ class VulkanApp
 
     VkCommandBuffer m_CommandBuffer;
 
+    VkSemaphore m_ImageAvailableSemaphore;
+
+    VkSemaphore m_RenderFinishedSemaphore;
+
+    VkFence m_InFlightFence;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -155,6 +161,10 @@ class VulkanApp
     void createCommandBuffer();
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+
+    void drawFrame();
+
+    void createSyncObjects();
 
 public:
     VulkanApp();
