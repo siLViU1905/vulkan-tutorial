@@ -94,6 +94,8 @@ class VulkanApp
 
     VkCommandPool m_CommandPool;
 
+    VkCommandBuffer m_CommandBuffer;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -149,6 +151,8 @@ class VulkanApp
     void createFramebuffers();
 
     void createCommandPool();
+
+    void createCommandBuffer();
 
 public:
     VulkanApp();

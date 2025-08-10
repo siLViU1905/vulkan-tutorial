@@ -555,7 +555,7 @@ void VulkanApp::createGraphicsPipeline()
 
     VkRect2D scissor{};
 
-    scissor.offset = {0,0};
+    scissor.offset = {0, 0};
     scissor.extent = m_SwapChainExtent;
 
     std::vector<VkDynamicState> dynamicStates = {
@@ -709,7 +709,7 @@ void VulkanApp::createRenderPass()
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
     subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments= &colorAttachmentRef;
+    subpass.pColorAttachments = &colorAttachmentRef;
 
     VkRenderPassCreateInfo renderPassInfo{};
 
@@ -727,7 +727,7 @@ void VulkanApp::createFramebuffers()
 {
     m_SwapChainFramebuffers.resize(m_SwapChainImageViews.size());
 
-    for (size_t i =0;i<m_SwapChainImageViews.size();++i)
+    for (size_t i = 0; i < m_SwapChainImageViews.size(); ++i)
     {
         VkImageView attachments[] = {m_SwapChainImageViews[i]};
 
@@ -758,6 +758,19 @@ void VulkanApp::createCommandPool()
 
     if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool))
         throw std::runtime_error("Failed to create command pool");
+}
+
+void VulkanApp::createCommandBuffer()
+{
+    VkCommandBufferAllocateInfo allocInfo{};
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = m_CommandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_CommandBuffer))
+        throw std::runtime_error("Failed to allocate command buffers");
 }
 
 VulkanApp::VulkanApp()
@@ -797,6 +810,8 @@ VulkanApp::VulkanApp()
     createFramebuffers();
 
     createCommandPool();
+
+    createCommandBuffer();
 }
 
 void VulkanApp::run()
@@ -809,9 +824,9 @@ void VulkanApp::run()
 
 VulkanApp::~VulkanApp()
 {
-   vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
+    vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 
-    for (auto& framebuffer : m_SwapChainFramebuffers)
+    for (auto &framebuffer: m_SwapChainFramebuffers)
         vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
 
     vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
