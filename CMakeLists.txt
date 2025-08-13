@@ -20,6 +20,7 @@ find_package(Vulkan REQUIRED)
 add_executable(vulkan
         main.cpp
         app/VulkanApp.cpp
+        app/Vertex.cpp
 )
 
 target_link_libraries(vulkan

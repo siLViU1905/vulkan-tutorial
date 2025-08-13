@@ -14,6 +14,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "Vertex.h"
+
 
 class VulkanApp
 {
@@ -42,9 +44,15 @@ class VulkanApp
         void *pUserData
     );
 
-    static auto readFile(const std::string& path);
+    static auto readFile(const std::string &path);
 
-    static void framebufferCallback(GLFWwindow* window, int width, int height);
+    static void framebufferCallback(GLFWwindow *window, int width, int height);
+
+    inline static std::vector<Vertex> vertices = {
+        {{-0.5f, -0.5f}, {1.f, 0.f, 0.f}},
+        {{0.5f, -0.5f}, {0.f, 1.f, 0.f}},
+        {{0.f, 0.5f}, {0.f, 0.f, 1.f}},
+    };
 
     //structs
     struct QueueFamilyIndices
@@ -110,6 +118,10 @@ class VulkanApp
 
     uint32_t currentFrame;
 
+    VkBuffer m_VertexBuffer;
+
+    VkDeviceMemory m_VertexBufferMemory;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -146,11 +158,11 @@ class VulkanApp
 
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
 
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
 
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
     void createSwapChain();
 
@@ -158,7 +170,7 @@ class VulkanApp
 
     void createGraphicsPipeline();
 
-    VkShaderModule createShaderModule(const std::vector<char>& code);
+    VkShaderModule createShaderModule(const std::vector<char> &code);
 
     void createRenderPass();
 
@@ -177,6 +189,10 @@ class VulkanApp
     void cleanupSwapChain();
 
     void recreateSwapChain();
+
+    void createVertexBuffer();
+
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 public:
     VulkanApp();
