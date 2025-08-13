@@ -105,6 +105,8 @@ class VulkanApp
 
     VkRenderPass m_RenderPass;
 
+    VkDescriptorSetLayout m_DescriptorSetLayout;
+
     VkPipelineLayout m_PipelineLayout;
 
     VkPipeline m_GraphicsPipeline;
@@ -130,6 +132,16 @@ class VulkanApp
     VkBuffer m_IndexBuffer;
 
     VkDeviceMemory m_IndexBufferMemory;
+
+    std::vector<VkBuffer> m_UniformBuffers;
+
+    std::vector<VkDeviceMemory> m_UniformBuffersMemory;
+
+    std::vector<void*> m_UniformBuffersMapped;
+
+    VkDescriptorPool m_DescriptorPool;
+
+    std::vector<VkDescriptorSet> m_DescriptorSets;
 
     //methods
     void enumerateAvailableExtensions();
@@ -209,6 +221,16 @@ class VulkanApp
     void copyBuffer(VkBuffer src, VkBuffer dstBuffer, VkDeviceSize size);
 
     void createIndexBuffer();
+
+    void createDescriptorSetLayout();
+
+    void createUniformBuffers();
+
+    void updateUniformBuffer(uint32_t currentImage);
+
+    void createDescriptorPool();
+
+    void createDescriptorSets();
 
 public:
     VulkanApp();
