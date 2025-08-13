@@ -987,41 +987,46 @@ void VulkanApp::recreateSwapChain()
 
 void VulkanApp::createVertexBuffer()
 {
+   VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        m_VertexBuffer, m_VertexBufferMemory);
+
+    void *data;
+
+    vkMapMemory(m_Device, m_VertexBufferMemory, 0, bufferSize, 0, &data);
+
+    memcpy(data, vertices.data(), bufferSize);
+
+    vkUnmapMemory(m_Device, m_VertexBufferMemory);
+}
+
+void VulkanApp::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+    VkBuffer&buffer, VkDeviceMemory&bufferMemory)
+{
     VkBufferCreateInfo bufferInfo{};
 
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(m_Device, &bufferInfo, nullptr, &m_VertexBuffer))
-        throw std::runtime_error("Failed to create vertex buffer");
+    if (vkCreateBuffer(m_Device, &bufferInfo, nullptr, &buffer))
+        throw std::runtime_error("Failed to create buffer");
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(m_Device, m_VertexBuffer, &memRequirements);
+    vkGetBufferMemoryRequirements(m_Device, buffer, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
 
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
-                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(m_Device, &allocInfo, nullptr, &m_VertexBufferMemory))
-        throw std::runtime_error("Failed to allocate vertex buffer memory");
+    if (vkAllocateMemory(m_Device, &allocInfo, nullptr, &bufferMemory))
+        throw std::runtime_error("failed to allocate buffer memory!");
 
-    vkBindBufferMemory(m_Device, m_VertexBuffer, m_VertexBufferMemory, 0);
-
-    void *data;
-
-    vkMapMemory(m_Device, m_VertexBufferMemory, 0, bufferInfo.size, 0, &data);
-
-    memcpy(data, vertices.data(), bufferInfo.size);
-
-    vkUnmapMemory(m_Device, m_VertexBufferMemory);
+    vkBindBufferMemory(m_Device, buffer, bufferMemory, 0);
 }
 
 uint32_t VulkanApp::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
