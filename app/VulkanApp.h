@@ -196,6 +196,8 @@ class VulkanApp
 
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
+    void copyBuffer(VkBuffer src, VkBuffer dstBuffer, VkDeviceSize size);
+
 public:
     VulkanApp();
 
