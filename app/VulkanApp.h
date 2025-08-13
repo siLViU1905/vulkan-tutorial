@@ -49,9 +49,14 @@ class VulkanApp
     static void framebufferCallback(GLFWwindow *window, int width, int height);
 
     inline static std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5f}, {1.f, 0.f, 0.f}},
-        {{0.5f, -0.5f}, {0.f, 1.f, 0.f}},
-        {{0.f, 0.5f}, {0.f, 0.f, 1.f}},
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}}
+    };
+
+    inline static std::vector<uint16_t> indices = {
+        0, 1, 2, 2, 3, 0
     };
 
     //structs
@@ -121,6 +126,10 @@ class VulkanApp
     VkBuffer m_VertexBuffer;
 
     VkDeviceMemory m_VertexBufferMemory;
+
+    VkBuffer m_IndexBuffer;
+
+    VkDeviceMemory m_IndexBufferMemory;
 
     //methods
     void enumerateAvailableExtensions();
@@ -192,11 +201,14 @@ class VulkanApp
 
     void createVertexBuffer();
 
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                      VkDeviceMemory &bufferMemory);
 
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     void copyBuffer(VkBuffer src, VkBuffer dstBuffer, VkDeviceSize size);
+
+    void createIndexBuffer();
 
 public:
     VulkanApp();
