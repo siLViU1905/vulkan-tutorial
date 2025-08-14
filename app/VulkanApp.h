@@ -49,10 +49,10 @@ class VulkanApp
     static void framebufferCallback(GLFWwindow *window, int width, int height);
 
     inline static std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}}
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
     };
 
     inline static std::vector<uint16_t> indices = {
@@ -137,11 +137,19 @@ class VulkanApp
 
     std::vector<VkDeviceMemory> m_UniformBuffersMemory;
 
-    std::vector<void*> m_UniformBuffersMapped;
+    std::vector<void *> m_UniformBuffersMapped;
 
     VkDescriptorPool m_DescriptorPool;
 
     std::vector<VkDescriptorSet> m_DescriptorSets;
+
+    VkImage m_TextureImage;
+
+    VkDeviceMemory m_TextureImageMemory;
+
+    VkImageView m_TextureImageView;
+
+    VkSampler m_TextureSampler;
 
     //methods
     void enumerateAvailableExtensions();
@@ -231,6 +239,26 @@ class VulkanApp
     void createDescriptorPool();
 
     void createDescriptorSets();
+
+    void createTextureImage();
+
+    void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+                     VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
+                     VkDeviceMemory &memory);
+
+    VkCommandBuffer beginSingleTimeCommands();
+
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
+    void createTextureImageView();
+
+    VkImageView createImageView(VkImage image, VkFormat format);
+
+    void createTextureSampler();
 
 public:
     VulkanApp();
