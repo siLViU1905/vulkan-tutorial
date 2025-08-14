@@ -21,6 +21,7 @@ add_executable(vulkan
         main.cpp
         app/VulkanApp.cpp
         app/Vertex.cpp
+        app/Mesh.cpp
 )
 
 target_link_libraries(vulkan

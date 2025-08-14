@@ -14,6 +14,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "Mesh.h"
 #include "Vertex.h"
 
 
@@ -36,19 +37,7 @@ class VulkanApp
 
     inline static bool WINDOW_RESIZED = false;
 
-    //static methods
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT messageType,
-        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-        void *pUserData
-    );
-
-    static auto readFile(const std::string &path);
-
-    static void framebufferCallback(GLFWwindow *window, int width, int height);
-
-    inline static std::vector<Vertex> vertices = {
+     inline static std::vector<Vertex> vertices = {
         {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
         {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
         {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
@@ -64,6 +53,19 @@ class VulkanApp
         0, 1, 2, 2, 3, 0,
         4, 5, 6, 6, 7, 4
     };
+
+    //static methods
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+        void *pUserData
+    );
+
+    static auto readFile(const std::string &path);
+
+    static void framebufferCallback(GLFWwindow *window, int width, int height);
+
 
     //structs
     struct QueueFamilyIndices
@@ -162,6 +164,8 @@ class VulkanApp
     VkDeviceMemory m_DepthImageMemory;
 
     VkImageView m_DepthImageView;
+
+    Mesh m_VikingRoom;
 
     //methods
     void enumerateAvailableExtensions();

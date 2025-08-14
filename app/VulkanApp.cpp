@@ -874,12 +874,12 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-    vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1,
                             &m_DescriptorSets[currentFrame], 0, nullptr);
 
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_VikingRoom.indices.size()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1080,7 +1080,7 @@ void VulkanApp::copyBuffer(VkBuffer src, VkBuffer dstBuffer, VkDeviceSize size)
 
 void VulkanApp::createVertexBuffer()
 {
-    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+    VkDeviceSize bufferSize = sizeof(m_VikingRoom.vertices[0]) * m_VikingRoom.vertices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1093,7 +1093,7 @@ void VulkanApp::createVertexBuffer()
 
     vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
-    memcpy(data, vertices.data(), bufferSize);
+    memcpy(data, m_VikingRoom.vertices.data(), bufferSize);
 
     vkUnmapMemory(m_Device, stagingBufferMemory);
 
@@ -1110,7 +1110,7 @@ void VulkanApp::createVertexBuffer()
 
 void VulkanApp::createIndexBuffer()
 {
-    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    VkDeviceSize bufferSize = sizeof(m_VikingRoom.indices[0]) * m_VikingRoom.indices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1123,7 +1123,7 @@ void VulkanApp::createIndexBuffer()
 
     vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
-    memcpy(data, indices.data(), bufferSize);
+    memcpy(data, m_VikingRoom.indices.data(), bufferSize);
 
     vkUnmapMemory(m_Device, stagingBufferMemory);
 
@@ -1287,7 +1287,7 @@ void VulkanApp::createTextureImage()
 {
     int width, height, channels;
 
-    unsigned char *pixels = stbi_load("../images/texture.jpg", &width, &height, &channels, STBI_rgb_alpha);
+    unsigned char *pixels = stbi_load("../models/vikingRoomTex.png", &width, &height, &channels, STBI_rgb_alpha);
 
     if (!pixels)
         throw std::runtime_error("Failed to load image");
@@ -1626,6 +1626,8 @@ VulkanApp::VulkanApp()
         throw std::runtime_error("Window initialization failed");
 
     currentFrame = 0;
+
+    m_VikingRoom.load("../models/vikingRoom.obj");
 
     glfwSetFramebufferSizeCallback(m_Window, framebufferCallback);
 
