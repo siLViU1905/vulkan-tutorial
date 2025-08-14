@@ -1,6 +1,10 @@
 #ifndef MVPUFFER_H
 #define MVPUFFER_H
+
+#define  GLM_FORCE_RADIANS
+#define  GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "../include/glm/glm.hpp"
+#include "../include/glm/gtc/matrix_transform.hpp"
 
 struct MVP
 {
