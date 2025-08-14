@@ -37,7 +37,7 @@ class VulkanApp
 
     inline static bool WINDOW_RESIZED = false;
 
-     inline static std::vector<Vertex> vertices = {
+     /*inline static std::vector<Vertex> vertices = {
         {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
         {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
         {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
@@ -52,7 +52,7 @@ class VulkanApp
     inline static std::vector<uint16_t> indices = {
         0, 1, 2, 2, 3, 0,
         4, 5, 6, 6, 7, 4
-    };
+    };*/
 
     //static methods
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(

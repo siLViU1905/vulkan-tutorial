@@ -15,8 +15,8 @@ void Mesh::load(const std::string &path)
     if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str()))
         throw std::runtime_error(err);
 
-    for (const auto& shape:shapes)
-        for (const auto& index:shape.mesh.indices)
+    for (const auto &shape: shapes)
+        for (const auto &index: shape.mesh.indices)
         {
             Vertex vertex;
 
@@ -30,6 +30,13 @@ void Mesh::load(const std::string &path)
                 attrib.texcoords[2 * index.texcoord_index],
                 attrib.texcoords[2 * index.texcoord_index + 1]
             };
+
+            if (index.normal_index >= 0 && !attrib.normals.empty())
+                vertex.normal = {
+                    attrib.normals[3 * index.normal_index],
+                    attrib.normals[3 * index.normal_index + 1],
+                    attrib.normals[3 * index.normal_index + 2]
+                };
 
             vertex.color = {1.0f, 1.0f, 1.0f};
 
