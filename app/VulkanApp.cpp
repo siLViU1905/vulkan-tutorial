@@ -1187,7 +1187,15 @@ void VulkanApp::createDescriptorSetLayout()
     samplerBinding.pImmutableSamplers = nullptr;
     samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboBinding, samplerBinding};
+    VkDescriptorSetLayoutBinding normalSamplerBinding{};
+
+    normalSamplerBinding.binding = 2;
+    normalSamplerBinding.descriptorCount = 1;
+    normalSamplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    normalSamplerBinding.pImmutableSamplers = nullptr;
+    normalSamplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboBinding, samplerBinding, normalSamplerBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
 
@@ -1252,7 +1260,7 @@ void VulkanApp::createDescriptorPool()
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2);
 
     VkDescriptorPoolCreateInfo poolInfo{};
 
@@ -1296,7 +1304,13 @@ void VulkanApp::createDescriptorSets()
         imageInfo.imageView = m_TextureImageView;
         imageInfo.sampler = m_TextureSampler;
 
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        VkDescriptorImageInfo normalImageInfo{};
+
+        normalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        normalImageInfo.imageView = m_NormalTextureImageView;
+        normalImageInfo.sampler = m_NormalTextureSampler;
+
+        std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = m_DescriptorSets[i];
@@ -1313,6 +1327,14 @@ void VulkanApp::createDescriptorSets()
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
+
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = m_DescriptorSets[i];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pImageInfo = &normalImageInfo;
 
         vkUpdateDescriptorSets(m_Device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
@@ -1550,6 +1572,9 @@ void VulkanApp::createTextureImageView()
 {
     m_TextureImageView = createImageView(m_TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT,
                                          m_MipLevels);
+
+    m_NormalTextureImageView = createImageView(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT,
+                                       m_MipLevels);
 }
 
 VkImageView VulkanApp::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
@@ -1609,6 +1634,9 @@ void VulkanApp::createTextureSampler()
 
     if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &m_TextureSampler))
         throw std::runtime_error("Failed to create texture sampler");
+
+    if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &m_NormalTextureSampler))
+        throw std::runtime_error("Failed to create normal texture sampler");
 }
 
 void VulkanApp::createDepthResources()
@@ -1788,6 +1816,58 @@ void VulkanApp::createColorResources()
     m_ColorImageView = createImageView(m_ColorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 
+void VulkanApp::createNormalTextureImage()
+{
+    int width, height, channels;
+    unsigned char* pixels = stbi_load("../models/backpack/normal.png", &width, &height, &channels, STBI_rgb_alpha);
+
+    if (!pixels)
+        throw std::runtime_error("Failed to load normal texture");
+
+    m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+    VkDeviceSize imageSize = width * height * 4;
+
+    VkBuffer stagingBuffer;
+
+    VkDeviceMemory stagingBufferMemory;
+
+    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer,
+                 stagingBufferMemory);
+
+    void *data;
+
+    vkMapMemory(m_Device, stagingBufferMemory, 0, imageSize, 0, &data);
+
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+
+    vkUnmapMemory(m_Device, stagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    createImage(width, height, m_MipLevels,
+                VK_SAMPLE_COUNT_1_BIT,
+                VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_NormalTextureImage, m_NormalTextureImageMemory);
+
+    transitionImageLayout(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB,
+                          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_MipLevels);
+
+    copyBufferToImage(stagingBuffer, m_NormalTextureImage, width, height);
+
+    transitionImageLayout(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_MipLevels);
+
+    vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
+
+    vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+
+    generateMipmaps(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB, width, height, m_MipLevels);
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -1841,6 +1921,8 @@ VulkanApp::VulkanApp()
     createSyncObjects();
 
     createTextureImage();
+
+    createNormalTextureImage();
 
     createTextureImageView();
 

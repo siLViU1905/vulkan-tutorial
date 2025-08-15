@@ -12,6 +12,9 @@ struct Mesh
     std::vector<uint32_t> indices;
 
     void load(const std::string& path);
+
+private:
+    void calculateTangents();
 };
 
 

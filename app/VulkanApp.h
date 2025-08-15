@@ -177,6 +177,14 @@ class VulkanApp
 
     VkImageView m_ColorImageView;
 
+    VkImage m_NormalTextureImage;
+
+    VkDeviceMemory m_NormalTextureImageMemory;
+
+    VkImageView m_NormalTextureImageView;
+
+    VkSampler m_NormalTextureSampler;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -299,6 +307,8 @@ class VulkanApp
     VkSampleCountFlagBits getMaxUsableSampleCount();
 
     void createColorResources();
+
+    void createNormalTextureImage();
 
 public:
     VulkanApp();
