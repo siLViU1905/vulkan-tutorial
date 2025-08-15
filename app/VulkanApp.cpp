@@ -320,6 +320,7 @@ void VulkanApp::createLogicalDevice()
     VkPhysicalDeviceFeatures deviceFeatures{};
 
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.sampleRateShading = VK_TRUE;
 
     VkDeviceCreateInfo createInfo{};
 
@@ -599,9 +600,9 @@ void VulkanApp::createGraphicsPipeline()
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.sampleShadingEnable = VK_TRUE;
     multisampling.rasterizationSamples = m_MsaaSamples;
-    multisampling.minSampleShading = 1.0f;
+    multisampling.minSampleShading = 1.f;
     multisampling.pSampleMask = nullptr;
     multisampling.alphaToCoverageEnable = VK_FALSE;
     multisampling.alphaToOneEnable = VK_FALSE;
@@ -1226,7 +1227,11 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 
     MVP ubo;
 
-    ubo.model = glm::rotate(glm::mat4(1.f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.model = glm::rotate(glm::mat4(1.f), glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f));
+
+    ubo.model = glm::rotate(ubo.model, time * glm::radians(90.f), glm::vec3(0.f, 1.f, 0.f));
+
+    ubo.model = glm::scale(ubo.model, glm::vec3(0.5f));
 
     ubo.view = glm::lookAt(glm::vec3(2.f), glm::vec3(0.f), glm::vec3(0.f, 0.f, 1.f));
 
@@ -1317,7 +1322,7 @@ void VulkanApp::createTextureImage()
 {
     int width, height, channels;
 
-    unsigned char *pixels = stbi_load("../models/vikingRoomTex.png", &width, &height, &channels, STBI_rgb_alpha);
+    unsigned char *pixels = stbi_load("../models/backpack/diffuse.jpg", &width, &height, &channels, STBI_rgb_alpha);
 
     if (!pixels)
         throw std::runtime_error("Failed to load image");
@@ -1797,7 +1802,7 @@ VulkanApp::VulkanApp()
 
     currentFrame = 0;
 
-    m_VikingRoom.load("../models/vikingRoom.obj");
+    m_VikingRoom.load("../models/backpack/backpack.obj");
 
     glfwSetFramebufferSizeCallback(m_Window, framebufferCallback);
 
