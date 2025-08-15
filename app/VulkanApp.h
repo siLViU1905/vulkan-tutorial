@@ -151,6 +151,8 @@ class VulkanApp
 
     std::vector<VkDescriptorSet> m_DescriptorSets;
 
+    uint32_t m_MipLevels;
+
     VkImage m_TextureImage;
 
     VkDeviceMemory m_TextureImageMemory;
@@ -258,7 +260,7 @@ class VulkanApp
 
     void createTextureImage();
 
-    void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
                      VkDeviceMemory &memory);
 
@@ -266,13 +268,13 @@ class VulkanApp
 
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
 
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
     void createTextureImageView();
 
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
 
     void createTextureSampler();
 
@@ -283,6 +285,8 @@ class VulkanApp
     VkFormat findDepthFormat();
 
     bool hasStencilComponent(VkFormat format);
+
+    void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t width, int32_t height, uint32_t mipLevels);
 
 public:
     VulkanApp();
