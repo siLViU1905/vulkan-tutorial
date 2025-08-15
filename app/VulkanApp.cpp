@@ -1179,23 +1179,25 @@ void VulkanApp::createDescriptorSetLayout()
 
     uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkDescriptorSetLayoutBinding samplerBinding{};
+    uint32_t bindingPoint = 1;
 
-    samplerBinding.binding = 1;
-    samplerBinding.descriptorCount = 1;
-    samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerBinding.pImmutableSamplers = nullptr;
-    samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
 
-    VkDescriptorSetLayoutBinding normalSamplerBinding{};
+    bindings.push_back(uboBinding);
 
-    normalSamplerBinding.binding = 2;
-    normalSamplerBinding.descriptorCount = 1;
-    normalSamplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    normalSamplerBinding.pImmutableSamplers = nullptr;
-    normalSamplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    for (auto &texture: m_ModelTextures)
+    {
+        VkDescriptorSetLayoutBinding samplerBinding{};
 
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboBinding, samplerBinding, normalSamplerBinding};
+        samplerBinding.binding = bindingPoint++;
+        samplerBinding.descriptorCount = 1;
+        samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        samplerBinding.pImmutableSamplers = nullptr;
+        samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        bindings.push_back(samplerBinding);
+    }
+
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
 
@@ -1241,7 +1243,7 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 
     ubo.model = glm::scale(ubo.model, glm::vec3(0.5f));
 
-    ubo.view = glm::lookAt(glm::vec3(2.f), glm::vec3(0.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.view = glm::lookAt(glm::vec3(0.f, 5.f,0.f), glm::vec3(0.f), glm::vec3(0.f, 0.f, 1.f));
 
     ubo.projection = glm::perspective(glm::radians(45.f),
                                       m_SwapChainExtent.width / static_cast<float>(m_SwapChainExtent.height), 0.1f,
@@ -1298,19 +1300,7 @@ void VulkanApp::createDescriptorSets()
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(MVP);
 
-        VkDescriptorImageInfo imageInfo{};
-
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = m_TextureImageView;
-        imageInfo.sampler = m_TextureSampler;
-
-        VkDescriptorImageInfo normalImageInfo{};
-
-        normalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        normalImageInfo.imageView = m_NormalTextureImageView;
-        normalImageInfo.sampler = m_NormalTextureSampler;
-
-        std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
+        std::vector<VkWriteDescriptorSet> descriptorWrites(m_ModelTextures.size() + 1);
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = m_DescriptorSets[i];
@@ -1320,77 +1310,92 @@ void VulkanApp::createDescriptorSets()
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &bufferInfo;
 
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = m_DescriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
+        int j = 1;
 
-        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2].dstSet = m_DescriptorSets[i];
-        descriptorWrites[2].dstBinding = 2;
-        descriptorWrites[2].dstArrayElement = 0;
-        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[2].descriptorCount = 1;
-        descriptorWrites[2].pImageInfo = &normalImageInfo;
+        std::vector<VkDescriptorImageInfo> imageInfos(m_ModelTextures.size());
+
+        for (size_t textureIndex = 0; textureIndex < m_ModelTextures.size(); ++textureIndex)
+        {
+            auto &texture = m_ModelTextures[textureIndex];
+
+            imageInfos[textureIndex].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfos[textureIndex].imageView = texture.imageView;
+            imageInfos[textureIndex].sampler = texture.sampler;
+
+            descriptorWrites[j].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[j].dstSet = m_DescriptorSets[i];
+            descriptorWrites[j].dstBinding = j;
+            descriptorWrites[j].dstArrayElement = 0;
+            descriptorWrites[j].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[j].descriptorCount = 1;
+            descriptorWrites[j].pImageInfo = &imageInfos[textureIndex];
+
+            ++j;
+        }
 
         vkUpdateDescriptorSets(m_Device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
 }
 
-void VulkanApp::createTextureImage()
+void VulkanApp::createModelTextureImages(const std::vector<std::string> &paths)
 {
-    int width, height, channels;
+    int i = 0;
+    for (const auto &path: paths)
+    {
+        int width, height, channels;
 
-    unsigned char *pixels = stbi_load("../models/backpack/diffuse.jpg", &width, &height, &channels, STBI_rgb_alpha);
+        unsigned char *pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 
-    if (!pixels)
-        throw std::runtime_error("Failed to load image");
+        if (!pixels)
+            throw std::runtime_error("Failed to load image");
 
-    m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+        m_ModelTextures[i].mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
 
-    VkDeviceSize imageSize = width * height * 4;
+        auto &mipLevels = m_ModelTextures[i].mipLevels;
 
-    VkBuffer stagingBuffer;
+        VkDeviceSize imageSize = width * height * 4;
 
-    VkDeviceMemory stagingBufferMemory;
+        VkBuffer stagingBuffer;
 
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer,
-                 stagingBufferMemory);
+        VkDeviceMemory stagingBufferMemory;
 
-    void *data;
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     stagingBuffer,
+                     stagingBufferMemory);
 
-    vkMapMemory(m_Device, stagingBufferMemory, 0, imageSize, 0, &data);
+        void *data;
 
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
+        vkMapMemory(m_Device, stagingBufferMemory, 0, imageSize, 0, &data);
 
-    vkUnmapMemory(m_Device, stagingBufferMemory);
+        memcpy(data, pixels, static_cast<size_t>(imageSize));
 
-    stbi_image_free(pixels);
+        vkUnmapMemory(m_Device, stagingBufferMemory);
 
-    createImage(width, height, m_MipLevels,
-                VK_SAMPLE_COUNT_1_BIT,
-                VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_TextureImage, m_TextureImageMemory);
+        stbi_image_free(pixels);
 
-    transitionImageLayout(m_TextureImage, VK_FORMAT_R8G8B8A8_SRGB,
-                          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_MipLevels);
+        createImage(width, height, mipLevels,
+                    VK_SAMPLE_COUNT_1_BIT,
+                    VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_ModelTextures[i].image, m_ModelTextures[i].memory);
 
-    copyBufferToImage(stagingBuffer, m_TextureImage, width, height);
+        transitionImageLayout(m_ModelTextures[i].image, VK_FORMAT_R8G8B8A8_SRGB,
+                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
 
-    transitionImageLayout(m_TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_MipLevels);
+        copyBufferToImage(stagingBuffer, m_ModelTextures[i].image, width, height);
 
-    vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
+        transitionImageLayout(m_ModelTextures[i].image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mipLevels);
 
-    vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+        vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
 
-    generateMipmaps(m_TextureImage, VK_FORMAT_R8G8B8A8_SRGB, width, height, m_MipLevels);
+        vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+
+        generateMipmaps(m_ModelTextures[i].image, VK_FORMAT_R8G8B8A8_SRGB, width, height, mipLevels);
+
+        ++i;
+    }
 }
 
 void VulkanApp::createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples,
@@ -1568,13 +1573,11 @@ void VulkanApp::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width
     endSingleTimeCommands(commandBuffer);
 }
 
-void VulkanApp::createTextureImageView()
+void VulkanApp::createModelImageViews()
 {
-    m_TextureImageView = createImageView(m_TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT,
-                                         m_MipLevels);
-
-    m_NormalTextureImageView = createImageView(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT,
-                                       m_MipLevels);
+    for (auto &texture: m_ModelTextures)
+        texture.imageView = createImageView(texture.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT,
+                                            texture.mipLevels);
 }
 
 VkImageView VulkanApp::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
@@ -1599,7 +1602,7 @@ VkImageView VulkanApp::createImageView(VkImage image, VkFormat format, VkImageAs
     return imageView;
 }
 
-void VulkanApp::createTextureSampler()
+void VulkanApp::createModelSamplers()
 {
     VkSamplerCreateInfo samplerInfo{};
 
@@ -1632,11 +1635,9 @@ void VulkanApp::createTextureSampler()
     samplerInfo.anisotropyEnable = VK_FALSE;
     samplerInfo.maxAnisotropy = 1.f;
 
-    if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &m_TextureSampler))
-        throw std::runtime_error("Failed to create texture sampler");
-
-    if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &m_NormalTextureSampler))
-        throw std::runtime_error("Failed to create normal texture sampler");
+    for (auto &texture: m_ModelTextures)
+        if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &texture.sampler))
+            throw std::runtime_error("Failed to create texture sampler");
 }
 
 void VulkanApp::createDepthResources()
@@ -1816,58 +1817,6 @@ void VulkanApp::createColorResources()
     m_ColorImageView = createImageView(m_ColorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 
-void VulkanApp::createNormalTextureImage()
-{
-    int width, height, channels;
-    unsigned char* pixels = stbi_load("../models/backpack/normal.png", &width, &height, &channels, STBI_rgb_alpha);
-
-    if (!pixels)
-        throw std::runtime_error("Failed to load normal texture");
-
-    m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
-
-    VkDeviceSize imageSize = width * height * 4;
-
-    VkBuffer stagingBuffer;
-
-    VkDeviceMemory stagingBufferMemory;
-
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer,
-                 stagingBufferMemory);
-
-    void *data;
-
-    vkMapMemory(m_Device, stagingBufferMemory, 0, imageSize, 0, &data);
-
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
-
-    vkUnmapMemory(m_Device, stagingBufferMemory);
-
-    stbi_image_free(pixels);
-
-    createImage(width, height, m_MipLevels,
-                VK_SAMPLE_COUNT_1_BIT,
-                VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_NormalTextureImage, m_NormalTextureImageMemory);
-
-    transitionImageLayout(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB,
-                          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_MipLevels);
-
-    copyBufferToImage(stagingBuffer, m_NormalTextureImage, width, height);
-
-    transitionImageLayout(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_MipLevels);
-
-    vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
-
-    vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
-
-    generateMipmaps(m_NormalTextureImage, VK_FORMAT_R8G8B8A8_SRGB, width, height, m_MipLevels);
-}
-
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -1920,13 +1869,11 @@ VulkanApp::VulkanApp()
 
     createSyncObjects();
 
-    createTextureImage();
+    createModelTextureImages({"../models/backpack/diffuse.jpg", "../models/backpack/normal.png"});
 
-    createNormalTextureImage();
+    createModelImageViews();
 
-    createTextureImageView();
-
-    createTextureSampler();
+    createModelSamplers();
 
     createVertexBuffer();
 
@@ -1964,21 +1911,16 @@ VulkanApp::~VulkanApp()
         vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
     }
 
-    vkDestroySampler(m_Device, m_NormalTextureSampler, nullptr);
+    for (auto &texture: m_ModelTextures)
+    {
+        vkDestroySampler(m_Device, texture.sampler, nullptr);
 
-    vkDestroyImageView(m_Device, m_NormalTextureImageView, nullptr);
+        vkDestroyImageView(m_Device, texture.imageView, nullptr);
 
-    vkDestroyImage(m_Device, m_NormalTextureImage, nullptr);
+        vkDestroyImage(m_Device, texture.image, nullptr);
 
-    vkFreeMemory(m_Device, m_NormalTextureImageMemory, nullptr);
-
-    vkDestroySampler(m_Device, m_TextureSampler, nullptr);
-
-    vkDestroyImageView(m_Device, m_TextureImageView, nullptr);
-
-    vkDestroyImage(m_Device, m_TextureImage, nullptr);
-
-    vkFreeMemory(m_Device, m_TextureImageMemory, nullptr);
+        vkFreeMemory(m_Device, texture.memory, nullptr);
+    }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {

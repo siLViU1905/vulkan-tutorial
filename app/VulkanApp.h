@@ -15,6 +15,7 @@
 #include <vulkan/vulkan.h>
 
 #include "Mesh.h"
+#include "Texture.h"
 #include "Vertex.h"
 
 
@@ -153,14 +154,6 @@ class VulkanApp
 
     uint32_t m_MipLevels;
 
-    VkImage m_TextureImage;
-
-    VkDeviceMemory m_TextureImageMemory;
-
-    VkImageView m_TextureImageView;
-
-    VkSampler m_TextureSampler;
-
     VkImage m_DepthImage;
 
     VkDeviceMemory m_DepthImageMemory;
@@ -177,13 +170,7 @@ class VulkanApp
 
     VkImageView m_ColorImageView;
 
-    VkImage m_NormalTextureImage;
-
-    VkDeviceMemory m_NormalTextureImageMemory;
-
-    VkImageView m_NormalTextureImageView;
-
-    VkSampler m_NormalTextureSampler;
+    std::array<Texture, 2> m_ModelTextures;
 
     //methods
     void enumerateAvailableExtensions();
@@ -274,7 +261,7 @@ class VulkanApp
 
     void createDescriptorSets();
 
-    void createTextureImage();
+    void createModelTextureImages(const std::vector<std::string>& paths);
 
     void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
@@ -288,11 +275,11 @@ class VulkanApp
 
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
-    void createTextureImageView();
+    void createModelImageViews();
 
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
 
-    void createTextureSampler();
+    void createModelSamplers();
 
     void createDepthResources();
 
@@ -307,8 +294,6 @@ class VulkanApp
     VkSampleCountFlagBits getMaxUsableSampleCount();
 
     void createColorResources();
-
-    void createNormalTextureImage();
 
 public:
     VulkanApp();
