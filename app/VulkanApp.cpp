@@ -1964,6 +1964,14 @@ VulkanApp::~VulkanApp()
         vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
     }
 
+    vkDestroySampler(m_Device, m_NormalTextureSampler, nullptr);
+
+    vkDestroyImageView(m_Device, m_NormalTextureImageView, nullptr);
+
+    vkDestroyImage(m_Device, m_NormalTextureImage, nullptr);
+
+    vkFreeMemory(m_Device, m_NormalTextureImageMemory, nullptr);
+
     vkDestroySampler(m_Device, m_TextureSampler, nullptr);
 
     vkDestroyImageView(m_Device, m_TextureImageView, nullptr);
