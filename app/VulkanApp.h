@@ -169,6 +169,14 @@ class VulkanApp
 
     Mesh m_VikingRoom;
 
+    VkSampleCountFlagBits m_MsaaSamples;
+
+    VkImage m_ColorImage;
+
+    VkDeviceMemory m_ColorImageMemory;
+
+    VkImageView m_ColorImageView;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -260,7 +268,7 @@ class VulkanApp
 
     void createTextureImage();
 
-    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling,
+    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
                      VkDeviceMemory &memory);
 
@@ -287,6 +295,10 @@ class VulkanApp
     bool hasStencilComponent(VkFormat format);
 
     void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t width, int32_t height, uint32_t mipLevels);
+
+    VkSampleCountFlagBits getMaxUsableSampleCount();
+
+    void createColorResources();
 
 public:
     VulkanApp();
