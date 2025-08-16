@@ -901,6 +901,8 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
 
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_VikingRoom.indices.size()), 1, 0, 0, 0);
 
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+
     vkCmdEndRenderPass(commandBuffer);
 
     if (vkEndCommandBuffer(commandBuffer))
@@ -923,6 +925,16 @@ void VulkanApp::drawFrame()
         return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         throw std::runtime_error("Failed to acquire swap chain image");
+
+    ImGui_ImplVulkan_NewFrame();
+
+    ImGui_ImplGlfw_NewFrame();
+
+    ImGui::NewFrame();
+
+    ImGui::ShowDemoWindow();
+
+    ImGui::Render();
 
     updateUniformBuffer(currentFrame);
 
@@ -1817,6 +1829,35 @@ void VulkanApp::createColorResources()
     m_ColorImageView = createImageView(m_ColorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 
+void VulkanApp::createImGuiDescriptorPool()
+{
+    VkDescriptorPoolSize poolSizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo = {};
+
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.maxSets = 1000 * IM_ARRAYSIZE(poolSizes);
+    poolInfo.poolSizeCount = static_cast<uint32_t>(IM_ARRAYSIZE(poolSizes));
+    poolInfo.pPoolSizes = poolSizes;
+
+    if (vkCreateDescriptorPool(m_Device, &poolInfo, nullptr, &m_ImGuiDescriptorPool))
+        throw std::runtime_error("Failed to create ImGui descriptor pool");
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -1885,6 +1926,40 @@ VulkanApp::VulkanApp()
     createDescriptorPool();
 
     createDescriptorSets();
+
+
+    createImGuiDescriptorPool();
+
+    IMGUI_CHECKVERSION();
+
+    m_ImGuiContext = ImGui::CreateContext();
+
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui_ImplGlfw_InitForVulkan(m_Window, true);
+
+    ImGui_ImplVulkan_InitInfo initInfo = {};
+
+    initInfo.Instance = m_Instance;
+    initInfo.PhysicalDevice = m_PhysicalDevice;
+    initInfo.Device = m_Device;
+    initInfo.QueueFamily = findQueueFamilies(m_PhysicalDevice).graphicsFamily.value();
+    initInfo.Queue = m_GraphicsQueue;
+    initInfo.PipelineCache = VK_NULL_HANDLE;
+    initInfo.DescriptorPool = m_ImGuiDescriptorPool;
+    initInfo.Subpass = 0;
+    initInfo.MinImageCount = m_SwapChainImages.size();
+    initInfo.ImageCount = m_SwapChainImages.size();
+    initInfo.MSAASamples = m_MsaaSamples;
+    initInfo.RenderPass = m_RenderPass;
+    initInfo.Allocator = nullptr;
+    initInfo.CheckVkResultFn = nullptr;
+
+    if (!ImGui_ImplVulkan_Init(&initInfo))
+        throw std::runtime_error("Failed to initialize ImGui");
+
 }
 
 void VulkanApp::run()
@@ -1929,6 +2004,14 @@ VulkanApp::~VulkanApp()
 
         vkFreeMemory(m_Device, m_UniformBuffersMemory[i], nullptr);
     }
+
+    ImGui_ImplVulkan_Shutdown();
+
+    ImGui_ImplGlfw_Shutdown();
+
+    ImGui::DestroyContext(m_ImGuiContext);
+
+    vkDestroyDescriptorPool(m_Device, m_ImGuiDescriptorPool, nullptr);
 
     vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
 

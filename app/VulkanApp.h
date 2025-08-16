@@ -17,6 +17,9 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Vertex.h"
+#include "../include/imgui/imgui.h"
+#include "../include/imgui/imgui_impl_glfw.h"
+#include "../include/imgui/imgui_impl_vulkan.h"
 
 
 class VulkanApp
@@ -172,6 +175,10 @@ class VulkanApp
 
     std::array<Texture, 5> m_ModelTextures;
 
+    VkDescriptorPool m_ImGuiDescriptorPool;
+
+    ImGuiContext* m_ImGuiContext;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -294,6 +301,8 @@ class VulkanApp
     VkSampleCountFlagBits getMaxUsableSampleCount();
 
     void createColorResources();
+
+    void createImGuiDescriptorPool();
 
 public:
     VulkanApp();

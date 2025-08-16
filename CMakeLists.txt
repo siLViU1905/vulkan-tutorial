@@ -17,11 +17,21 @@ endif ()
 
 find_package(Vulkan REQUIRED)
 
+
 add_executable(vulkan
         main.cpp
         app/VulkanApp.cpp
         app/Vertex.cpp
         app/Mesh.cpp
+
+        #imgui
+        include/imgui/imgui.cpp
+        include/imgui/imgui_demo.cpp
+        include/imgui/imgui_draw.cpp
+        include/imgui/imgui_widgets.cpp
+        include/imgui/imgui_tables.cpp
+        include/imgui/imgui_impl_glfw.cpp
+        include/imgui/imgui_impl_vulkan.cpp
 )
 
 target_link_libraries(vulkan
