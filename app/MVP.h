@@ -11,6 +11,12 @@ struct MVP
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 projection;
+
+    glm::vec3 color;
+
+    char padding[4];
 };
+
+static_assert(sizeof(MVP) % 16 == 0, "Sizeof MVP is not divisible by 16");
 
 #endif //MVPBUFFER_H

@@ -163,7 +163,7 @@ class VulkanApp
 
     VkImageView m_DepthImageView;
 
-    Mesh m_VikingRoom;
+    Mesh m_Backpack;
 
     VkSampleCountFlagBits m_MsaaSamples;
 
@@ -178,6 +178,32 @@ class VulkanApp
     VkDescriptorPool m_ImGuiDescriptorPool;
 
     ImGuiContext* m_ImGuiContext;
+
+    Mesh m_Sphere;
+
+    VkDescriptorSetLayout m_SphereDescriptorSetLayout;
+
+    VkPipelineLayout m_SpherePipelineLayout;
+
+    VkPipeline m_SphereGraphicsPipeline;
+
+    VkBuffer m_SphereVertexBuffer;
+
+    VkDeviceMemory m_SphereVertexBufferMemory;
+
+    VkBuffer m_SphereIndexBuffer;
+
+    VkDeviceMemory m_SphereIndexBufferMemory;
+
+    std::vector<VkBuffer> m_SphereUniformBuffers;
+
+    std::vector<VkDeviceMemory> m_SphereUniformBuffersMemory;
+
+    std::vector<void *> m_SphereUniformBuffersMapped;
+
+    VkDescriptorPool m_SphereDescriptorPool;
+
+    std::vector<VkDescriptorSet> m_SphereDescriptorSets;
 
     //methods
     void enumerateAvailableExtensions();
@@ -303,6 +329,20 @@ class VulkanApp
     void createColorResources();
 
     void createImGuiDescriptorPool();
+
+    void createSphereGraphicsPipeline();
+
+    void createSphereBuffers();
+
+    void createSphereDescriptorSetLayout();
+
+    void createSphereUniformBuffers();
+
+    void updateSphereUniformBuffer(uint32_t currentImage);
+
+    void createSphereDescriptorPool();
+
+    void createSphereDescriptorSets();
 
 public:
     VulkanApp();

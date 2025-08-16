@@ -19,12 +19,14 @@ layout(binding = 0) uniform MVP
     mat4 model;
     mat4 view;
     mat4 projection;
+
+    vec3 color;
 }
 mvp;
 
 void main()
 {
-    fragColor = aColor;
+    fragColor = mvp.color;
 
     fragTexCoords = aTexCoords;
 
