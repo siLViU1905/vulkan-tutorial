@@ -170,7 +170,7 @@ class VulkanApp
 
     VkImageView m_ColorImageView;
 
-    std::array<Texture, 2> m_ModelTextures;
+    std::array<Texture, 5> m_ModelTextures;
 
     //methods
     void enumerateAvailableExtensions();

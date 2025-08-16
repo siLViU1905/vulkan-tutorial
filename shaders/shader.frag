@@ -8,8 +8,13 @@ layout(location = 2) in vec3 fragNormal;
 layout(location = 3) in vec2 fragTexCoords;
 layout(location = 4) in mat3 fragTBN;
 
+layout(location = 7) in vec3 viewPos;
+
 layout(binding = 1) uniform sampler2D texSampler;
 layout(binding = 2) uniform sampler2D normalSampler;
+layout(binding = 3) uniform sampler2D roughnessSampler;
+layout(binding = 4) uniform sampler2D aoSampler;
+layout(binding = 5) uniform sampler2D specularSampler;
 
 struct DirectionalLight
 {
@@ -20,20 +25,23 @@ struct DirectionalLight
     vec3 color;
 };
 
-vec3 processDirectionalLight(DirectionalLight light, vec3 materialColor, vec3 normal)
+vec3 processDirectionalLight(DirectionalLight light, vec3 materialColor, vec3 normal, float roughness, float ao,
+float specularIntensity)
 {
-    vec3 ambient = light.ambient * materialColor;
+    vec3 ambient = light.ambient * materialColor * ao;
 
-    vec3 ViewPos = vec3(2.0);
 
     vec3 lightDir = normalize(-light.direction);
     float diff = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = light.diffuse * light.color * diff * materialColor;
 
-    vec3 viewDir = normalize(ViewPos - fragPos);
+    vec3 viewDir = normalize(viewPos - fragPos);
     vec3 halfwayDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
-    vec3 specular = light.specular * spec * light.color;
+
+    float shininess = mix(100.0, 5.0, roughness);
+
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+    vec3 specular = light.specular * spec * light.color * specularIntensity;
 
     return ambient + diffuse + specular;
 }
@@ -48,17 +56,20 @@ void main()
 
     vec3 worldNormal = normalize(fragTBN * normalMap);
 
+    float roughness = texture(roughnessSampler, fragTexCoords).r;
+
+    float ao = texture(aoSampler, fragTexCoords).r;
+
+    float specularIntensity = texture(specularSampler, fragTexCoords).r;
+
     DirectionalLight light;
 
-    light.ambient = vec3(0.2);
+    light.ambient = vec3(0.05);
+    light.diffuse = vec3(0.3);
+    light.specular = vec3(0.4);
+    light.color = vec3(0.9);
 
-    light.diffuse = vec3(0.8);
+    light.direction = vec3(-1.0, -1.0, 0.0);
 
-    light.specular = vec3(1.0);
-
-    light.color = vec3(1.0);
-
-    light.direction = vec3(0.0, -1.0, 0.0);
-
-    outColor = vec4(processDirectionalLight(light, materialColor.rgb, worldNormal), materialColor.a);
+    outColor = vec4(processDirectionalLight(light, materialColor.rgb, worldNormal, roughness, ao, specularIntensity), materialColor.a);
 }

@@ -12,6 +12,8 @@ layout(location = 2) out vec3 fragNormal;
 layout(location = 3) out vec2 fragTexCoords;
 layout(location = 4) out mat3 fragTBN;
 
+layout(location = 7) out vec3 viewPos;
+
 layout(binding = 0) uniform MVP
 {
     mat4 model;
@@ -39,6 +41,10 @@ void main()
     fragNormal = N;
 
     fragTBN = mat3(T, B, N);
+
+    mat4 invView = inverse(mvp.view);
+
+    viewPos = invView[3].xyz;
 
     fragPos = vec3(mvp.model * vec4(aPos, 1.0));
 

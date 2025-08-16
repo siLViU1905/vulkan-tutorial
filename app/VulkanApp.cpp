@@ -1262,7 +1262,7 @@ void VulkanApp::createDescriptorPool()
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * m_ModelTextures.size());
 
     VkDescriptorPoolCreateInfo poolInfo{};
 
@@ -1869,7 +1869,8 @@ VulkanApp::VulkanApp()
 
     createSyncObjects();
 
-    createModelTextureImages({"../models/backpack/diffuse.jpg", "../models/backpack/normal.png"});
+    createModelTextureImages({"../models/backpack/diffuse.jpg", "../models/backpack/normal.png",
+        "../models/backpack/roughness.jpg", "../models/backpack/ao.jpg", "../models/backpack/specular.jpg"});
 
     createModelImageViews();
 
