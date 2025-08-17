@@ -16,7 +16,6 @@ layout(binding = 4) uniform sampler2D roughnessSampler;
 layout(binding = 5) uniform sampler2D aoSampler;
 layout(binding = 6) uniform sampler2D specularSampler;
 
-
 layout(binding = 1) uniform Light
 {
     vec3 color;
@@ -27,7 +26,13 @@ layout(binding = 1) uniform Light
 
     vec3 ambient;
 
-    vec3 direction;
+    vec3 position;
+
+    float constant;
+
+    float linear;
+
+    float quadratic;
 }
 light;
 
@@ -41,9 +46,16 @@ vec3 processLight(
 {
     vec3 ambient = light.ambient * materialColor * ao;
 
-    vec3 lightDir = normalize(-light.direction);
+    vec3 lightDir = normalize(light.position - fragPos);
+
+    float distance = length(light.position - fragPos);
+
+
+    float attenuation = 1.0 / (light.constant + light.linear * distance +
+        light.quadratic * (distance * distance));
+
     float diff = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = light.diffuse * light.color * diff * materialColor;
+    vec3 diffuse = light.diffuse * light.color * diff * materialColor * attenuation;
 
     vec3 viewDir = normalize(viewPos - fragPos);
     vec3 halfwayDir = normalize(lightDir + viewDir);
@@ -51,7 +63,7 @@ vec3 processLight(
     float shininess = mix(100.0, 5.0, roughness);
 
     float spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
-    vec3 specular = light.specular * spec * light.color * specularIntensity;
+    vec3 specular = light.specular * spec * light.color * specularIntensity * attenuation;
 
     return ambient + diffuse + specular;
 }

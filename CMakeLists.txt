@@ -33,6 +33,7 @@ add_executable(vulkan
         include/imgui/imgui_impl_glfw.cpp
         include/imgui/imgui_impl_vulkan.cpp
         app/LightBuffer.cpp
+        app/PbrMaterialBuffer.cpp
 )
 
 target_link_libraries(vulkan

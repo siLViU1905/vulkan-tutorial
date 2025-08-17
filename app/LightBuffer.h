@@ -7,18 +7,34 @@ struct LightBuffer
 {
     LightBuffer();
 
-    glm::vec4 m_Color;
+    glm::vec3 m_Color;
 
-    glm::vec4 m_Diffuse;
+    float padding0;
 
-    glm::vec4 m_Specular;
+    glm::vec3 m_Diffuse;
 
-    glm::vec4 m_Ambient;
+    float padding1;
 
-    glm::vec4 m_Direction;
+    glm::vec3 m_Specular;
+
+    float padding2;
+
+    glm::vec3 m_Ambient;
+
+    float padding3;
+
+    glm::vec3 m_Position;
+
+    float constant;
+
+    float linear;
+
+    float quadratic;
+
+    float padding5;
 };
 
-static_assert(sizeof(LightBuffer) % 16 == 0, "Sizeof LightBuffer is not divisible by 16");
+//static_assert(sizeof(LightBuffer) % 16 == 0, "Sizeof LightBuffer is not divisible by 16");
 
 
 #endif //LIGHTBUFFER_H

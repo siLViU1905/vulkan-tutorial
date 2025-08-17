@@ -21,6 +21,7 @@
 #include "../include/imgui/imgui_impl_glfw.h"
 #include "../include/imgui/imgui_impl_vulkan.h"
 #include "LightBuffer.h"
+#include "PbrMaterialBuffer.h"
 
 
 class VulkanApp
@@ -213,6 +214,14 @@ class VulkanApp
     std::vector<void *> m_LightUniformBuffersMapped;
 
     LightBuffer m_LightBuffer;
+
+    std::vector<VkBuffer> m_PbrUniformBuffers;
+
+    std::vector<VkDeviceMemory> m_PbrUniformBuffersMemory;
+
+    std::vector<void *> m_PbrUniformBuffersMapped;
+
+    PbrMaterialBuffer m_PbrBuffer;
 
     //methods
     void enumerateAvailableExtensions();

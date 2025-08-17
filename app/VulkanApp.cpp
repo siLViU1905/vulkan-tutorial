@@ -950,6 +950,12 @@ void VulkanApp::drawFrame()
 
     ImGui::Begin("Sphere");
 
+    ImGui::SliderFloat("Metalness", &m_PbrBuffer.m_Metalness.x, 0.f,1.f);
+
+    ImGui::SliderFloat("Roughness", &m_PbrBuffer.m_Roughness.x, 0.f,1.f);
+
+    ImGui::SliderFloat("Ao", &m_PbrBuffer.m_Ao.x, 0.f,1.f);
+
     ImGui::ColorPicker3("Color", glm::value_ptr(m_Sphere.m_Color));
 
     ImGui::End();
@@ -964,7 +970,13 @@ void VulkanApp::drawFrame()
 
     ImGui::ColorPicker4("Ambient", glm::value_ptr(m_LightBuffer.m_Ambient));
 
-    ImGui::SliderFloat3("Direction", glm::value_ptr(m_LightBuffer.m_Direction), -1.f, 1.f);
+    ImGui::SliderFloat3("Position", glm::value_ptr(m_LightBuffer.m_Position), -5.f, 5.f);
+
+    ImGui::SliderFloat("Constant", &m_LightBuffer.constant, 0.f,1.f);
+
+    ImGui::SliderFloat("Linear", &m_LightBuffer.linear, 0.f,1.f);
+
+    ImGui::SliderFloat("Quadratic", &m_LightBuffer.quadratic, 0.f,1.f);
 
     ImGui::End();
 
@@ -2158,12 +2170,19 @@ void VulkanApp::createSphereDescriptorSetLayout()
     lightUboBinding.descriptorCount = 1;
     lightUboBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding bindings[] = {uboBinding, lightUboBinding};
+    VkDescriptorSetLayoutBinding pbrUboBinding{};
+
+    pbrUboBinding.binding = 2;
+    pbrUboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pbrUboBinding.descriptorCount = 1;
+    pbrUboBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding bindings[] = {uboBinding, lightUboBinding, pbrUboBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
 
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(m_Device, &layoutInfo, nullptr, &m_SphereDescriptorSetLayout))
@@ -2174,16 +2193,29 @@ void VulkanApp::createSphereUniformBuffers()
 {
     VkDeviceSize bufferSize = sizeof(MVP);
 
+    VkDeviceSize pbrBufferSize = sizeof(PbrMaterialBuffer);
+
     m_SphereUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     m_SphereUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
     m_SphereUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    m_PbrUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    m_PbrUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    m_PbrUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
         createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      m_SphereUniformBuffers[i], m_SphereUniformBuffersMemory[i]);
+
         vkMapMemory(m_Device, m_SphereUniformBuffersMemory[i], 0, bufferSize, 0, &m_SphereUniformBuffersMapped[i]);
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     m_PbrUniformBuffers[i], m_PbrUniformBuffersMemory[i]);
+
+        vkMapMemory(m_Device, m_PbrUniformBuffersMemory[i], 0, pbrBufferSize, 0, &m_PbrUniformBuffersMapped[i]);
     }
 }
 
@@ -2204,6 +2236,8 @@ void VulkanApp::updateSphereUniformBuffer(uint32_t currentImage)
     ubo.color = m_Sphere.m_Color;
 
     memcpy(m_SphereUniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+
+    memcpy(m_PbrUniformBuffersMapped[currentImage], &m_PbrBuffer, sizeof(m_PbrBuffer));
 }
 
 void VulkanApp::createSphereDescriptorPool()
@@ -2211,7 +2245,7 @@ void VulkanApp::createSphereDescriptorPool()
     VkDescriptorPoolSize poolSize{};
 
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2);
+    poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 3);
 
     VkDescriptorPoolCreateInfo poolInfo{};
 
@@ -2254,7 +2288,13 @@ void VulkanApp::createSphereDescriptorSets()
         lightBufferInfo.offset = 0;
         lightBufferInfo.range = sizeof(LightBuffer);
 
-        std::array<VkWriteDescriptorSet,2> descriptorWrites{};
+        VkDescriptorBufferInfo pbrBufferInfo{};
+
+        pbrBufferInfo.buffer = m_PbrUniformBuffers[i];
+        pbrBufferInfo.offset = 0;
+        pbrBufferInfo.range = sizeof(PbrMaterialBuffer);
+
+        std::array<VkWriteDescriptorSet,3> descriptorWrites{};
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = m_SphereDescriptorSets[i];
@@ -2271,6 +2311,14 @@ void VulkanApp::createSphereDescriptorSets()
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pBufferInfo = &lightBufferInfo;
+
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = m_SphereDescriptorSets[i];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pBufferInfo = &pbrBufferInfo;
 
         vkUpdateDescriptorSets(m_Device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
@@ -2456,6 +2504,13 @@ VulkanApp::~VulkanApp()
         vkDestroyBuffer(m_Device, m_LightUniformBuffers[i], nullptr);
 
         vkFreeMemory(m_Device, m_LightUniformBuffersMemory[i], nullptr);
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        vkDestroyBuffer(m_Device, m_PbrUniformBuffers[i], nullptr);
+
+        vkFreeMemory(m_Device, m_PbrUniformBuffersMemory[i], nullptr);
     }
 
     ImGui_ImplVulkan_Shutdown();
