@@ -20,6 +20,7 @@
 #include "../include/imgui/imgui.h"
 #include "../include/imgui/imgui_impl_glfw.h"
 #include "../include/imgui/imgui_impl_vulkan.h"
+#include "LightBuffer.h"
 
 
 class VulkanApp
@@ -41,22 +42,22 @@ class VulkanApp
 
     inline static bool WINDOW_RESIZED = false;
 
-     /*inline static std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+    /*inline static std::vector<Vertex> vertices = {
+       {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+       {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+       {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+       {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
 
-        {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-        {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-        {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-        {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-    };
+       {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+       {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+       {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+       {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
+   };
 
-    inline static std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0,
-        4, 5, 6, 6, 7, 4
-    };*/
+   inline static std::vector<uint16_t> indices = {
+       0, 1, 2, 2, 3, 0,
+       4, 5, 6, 6, 7, 4
+   };*/
 
     //static methods
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -177,7 +178,7 @@ class VulkanApp
 
     VkDescriptorPool m_ImGuiDescriptorPool;
 
-    ImGuiContext* m_ImGuiContext;
+    ImGuiContext *m_ImGuiContext;
 
     Mesh m_Sphere;
 
@@ -204,6 +205,14 @@ class VulkanApp
     VkDescriptorPool m_SphereDescriptorPool;
 
     std::vector<VkDescriptorSet> m_SphereDescriptorSets;
+
+    std::vector<VkBuffer> m_LightUniformBuffers;
+
+    std::vector<VkDeviceMemory> m_LightUniformBuffersMemory;
+
+    std::vector<void *> m_LightUniformBuffersMapped;
+
+    LightBuffer m_LightBuffer;
 
     //methods
     void enumerateAvailableExtensions();
@@ -294,9 +303,10 @@ class VulkanApp
 
     void createDescriptorSets();
 
-    void createModelTextureImages(const std::vector<std::string>& paths);
+    void createModelTextureImages(const std::vector<std::string> &paths);
 
-    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling,
+    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples,
+                     VkFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
                      VkDeviceMemory &memory);
 
@@ -304,7 +314,8 @@ class VulkanApp
 
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
+                               uint32_t mipLevels);
 
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
@@ -316,7 +327,8 @@ class VulkanApp
 
     void createDepthResources();
 
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+    VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+                                 VkFormatFeatureFlags features);
 
     VkFormat findDepthFormat();
 

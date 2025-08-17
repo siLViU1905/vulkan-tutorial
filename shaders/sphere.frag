@@ -10,20 +10,29 @@ layout(location = 4) in mat3 fragTBN;
 
 layout(location = 7) in vec3 viewPos;
 
-struct DirectionalLight
+layout(binding = 1) uniform Light
 {
-    vec3 direction;
-    vec3 diffuse;
-    vec3 specular;
-    vec3 ambient;
     vec3 color;
-};
 
-vec3 processDirectionalLight(DirectionalLight light, vec3 materialColor, vec3 normal, float roughness, float ao,
-                             float specularIntensity)
+    vec3 diffuse;
+
+    vec3 specular;
+
+    vec3 ambient;
+
+    vec3 direction;
+}
+light;
+
+vec3 processLight(
+    vec3 materialColor,
+    vec3 normal,
+    float roughness,
+    float ao,
+    float specularIntensity
+)
 {
     vec3 ambient = light.ambient * materialColor * ao;
-
 
     vec3 lightDir = normalize(-light.direction);
     float diff = max(dot(normal, lightDir), 0.0);
@@ -43,14 +52,5 @@ vec3 processDirectionalLight(DirectionalLight light, vec3 materialColor, vec3 no
 void main()
 {
 
-    DirectionalLight light;
-
-    light.ambient = vec3(0.05);
-    light.diffuse = vec3(0.3);
-    light.specular = vec3(0.4);
-    light.color = vec3(0.9);
-
-    light.direction = vec3(-1.0, -1.0, 0.0);
-
-    outColor = vec4(processDirectionalLight(light, fragColor,fragNormal,0.5,0.5,0.5),1.0);
+    outColor = vec4(processLight(fragColor, fragNormal, 0.5, 0.5, 0.5), 1.0);
 }
