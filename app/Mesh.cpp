@@ -53,6 +53,7 @@ void Mesh::load(const std::string &path)
 
             vertices.push_back(vertex);
 
+
             indices.push_back(indices.size());
         }
 
@@ -142,6 +143,27 @@ void Mesh::rotate(const glm::vec3 &offset)
 void Mesh::scale(const glm::vec3 &offset)
 {
     m_Scale += offset;
+
+    updateModel();
+}
+
+void Mesh::setPosition(const glm::vec3 &position)
+{
+    m_Position = position;
+
+    updateModel();
+}
+
+void Mesh::setRotation(const glm::vec3 &rotation)
+{
+    m_Rotation = rotation;
+
+    updateModel();
+}
+
+void Mesh::setScale(const glm::vec3 &scale)
+{
+    m_Scale = scale;
 
     updateModel();
 }

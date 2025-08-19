@@ -6,11 +6,13 @@ struct PbrMaterialBuffer
 {
     PbrMaterialBuffer();
 
-    glm::vec4 m_Metalness;
+    float m_Metalness;
 
-    glm::vec4 m_Roughness;
+    float m_Roughness;
 
-    glm::vec4 m_Ao;
+    float m_Ao;
+
+    float padding;
 };
 
 

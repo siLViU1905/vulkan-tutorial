@@ -1,5 +1,19 @@
 #include "Vertex.h"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include "../include/glm/gtx/hash.hpp"
+
+namespace std {
+    template<> struct hash<Vertex> {
+        size_t operator()(const Vertex& vertex) const noexcept
+        {
+            return ((hash<glm::vec3>()(vertex.position) ^
+                   (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+                   (hash<glm::vec2>()(vertex.texCoords) << 1);
+        }
+    };
+}
+
 VkVertexInputBindingDescription Vertex::getBindingDescription()
 {
     VkVertexInputBindingDescription bindingDescription{};
@@ -41,4 +55,9 @@ std::array<VkVertexInputAttributeDescription, 5> Vertex::getAttributeDescription
     attributeDescriptions[4].offset = offsetof(Vertex, tangent);
 
     return attributeDescriptions;
+}
+
+bool Vertex::operator==(const Vertex &other) const
+{
+    return position == other.position && color == other.color && texCoords == other.texCoords;
 }

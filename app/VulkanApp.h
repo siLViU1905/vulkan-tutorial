@@ -43,23 +43,6 @@ class VulkanApp
 
     inline static bool WINDOW_RESIZED = false;
 
-    /*inline static std::vector<Vertex> vertices = {
-       {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-       {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-       {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-       {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-       {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-       {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-       {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-       {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-   };
-
-   inline static std::vector<uint16_t> indices = {
-       0, 1, 2, 2, 3, 0,
-       4, 5, 6, 6, 7, 4
-   };*/
-
     //static methods
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -223,6 +206,32 @@ class VulkanApp
 
     PbrMaterialBuffer m_PbrBuffer;
 
+    Texture m_EnvironmentMap;
+
+    Texture m_BrdfLutTexture;
+
+    VkRenderPass m_BrdfLutRenderPass;
+
+    VkFramebuffer m_BrdfLutFramebuffer;
+
+    VkPipelineLayout m_BrdfLutGraphicsPipelineLayout;
+
+    VkPipeline m_BrdfLutGraphicsPipeline;
+
+    VkDescriptorSetLayout m_SkyboxDescriptorSetLayout;
+
+    VkPipelineLayout m_SkyboxPipelineLayout;
+
+    VkPipeline m_SkyboxGraphicsPipeline;
+
+    VkBuffer m_SkyboxVertexBuffer;
+
+    VkDeviceMemory m_SkyboxVertexBufferMemory;
+
+    VkDescriptorPool m_SkyboxDescriptorPool;
+
+    std::vector<VkDescriptorSet> m_SkyboxDescriptorSets;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -353,9 +362,15 @@ class VulkanApp
 
     void createSphereGraphicsPipeline();
 
+    void createSkyboxGraphicsPipeline();
+
     void createSphereBuffers();
 
+    void createSkyboxBuffers();
+
     void createSphereDescriptorSetLayout();
+
+    void createSkyboxDescriptorSetLayout();
 
     void createSphereUniformBuffers();
 
@@ -363,7 +378,49 @@ class VulkanApp
 
     void createSphereDescriptorPool();
 
+    void createSkyboxDescriptorPool();
+
     void createSphereDescriptorSets();
+
+    void createSkyboxDescriptorSets();
+
+    void renderMeshMenu(const std::string& title, Mesh& mesh);
+
+    void createIBLResources();
+
+    void loadCubemap(const std::array<std::string, 6>& paths, Texture& cubemap);
+
+    void createCubemap(uint32_t size, uint32_t mipLevels, VkFormat format,
+                              VkImageUsageFlags usage, Texture& cubemap);
+
+    void createCubemapImageView(Texture& cubemap, VkFormat format);
+
+    void createCubemapSampler(Texture& cubemap);
+
+    void transitionCubemapImageLayout(VkImage image, VkFormat format,
+                                            VkImageLayout oldLayout, VkImageLayout newLayout,
+                                            uint32_t mipLevels);
+
+    void copyStagingBufferToCubemap(VkBuffer buffer, VkImage image,
+                                          uint32_t width, uint32_t height);
+
+    void generateCubemapMipMaps(VkImage image, VkFormat imageFormat, int32_t width, int32_t height, uint32_t mipLevels);
+
+    void generateBRDFLUT();
+
+    void createBRDFLUTSampler();
+
+    void createBRDFLUTRenderPass();
+
+    void createBRDFLUTFramebuffer(uint32_t size);
+
+    void createBRDFLUTPipeline();
+
+    void renderBRDFLUT(uint32_t size);
+
+    void cleanupBRDFLUTResources();
+
+    void destroyTexture(Texture& texture);
 
 public:
     VulkanApp();
@@ -372,4 +429,5 @@ public:
 
     ~VulkanApp();
 };
+
 #endif //VULKANAPP_H

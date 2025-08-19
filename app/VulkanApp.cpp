@@ -846,7 +846,6 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
 
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-
     if (vkBeginCommandBuffer(commandBuffer, &beginInfo))
         throw std::runtime_error("Failed to begin recording command buffer");
 
@@ -869,6 +868,19 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+    VkDeviceSize offsets[] = {0};
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SkyboxGraphicsPipeline);
+
+    VkBuffer skyboxVertexBuffers[] = {m_SkyboxVertexBuffer};
+
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, skyboxVertexBuffers, offsets);
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SkyboxPipelineLayout, 0, 1,
+                            &m_SkyboxDescriptorSets[currentFrame], 0, nullptr);
+
+    vkCmdDraw(commandBuffer, 36, 1,0,0);
+
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
 
     VkViewport viewport{};
@@ -890,8 +902,6 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
     VkBuffer vertexBuffers[] = {m_VertexBuffer};
-
-    VkDeviceSize offsets[] = {0};
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
@@ -948,15 +958,17 @@ void VulkanApp::drawFrame()
 
     ImGui::NewFrame();
 
-    ImGui::Begin("Sphere");
+    renderMeshMenu("Sphere", m_Sphere);
 
-    ImGui::SliderFloat("Metalness", &m_PbrBuffer.m_Metalness.x, 0.f,1.f);
+    renderMeshMenu("Backpack", m_Backpack);
 
-    ImGui::SliderFloat("Roughness", &m_PbrBuffer.m_Roughness.x, 0.f,1.f);
+    ImGui::Begin("Pbr Buffer");
 
-    ImGui::SliderFloat("Ao", &m_PbrBuffer.m_Ao.x, 0.f,1.f);
+    ImGui::SliderFloat("Metalness", &m_PbrBuffer.m_Metalness, 0.f, 1.f);
 
-    ImGui::ColorPicker3("Color", glm::value_ptr(m_Sphere.m_Color));
+    ImGui::SliderFloat("Roughness", &m_PbrBuffer.m_Roughness, 0.f, 1.f);
+
+    ImGui::SliderFloat("Ao", &m_PbrBuffer.m_Ao, 0.f, 1.f);
 
     ImGui::End();
 
@@ -972,11 +984,11 @@ void VulkanApp::drawFrame()
 
     ImGui::SliderFloat3("Position", glm::value_ptr(m_LightBuffer.m_Position), -5.f, 5.f);
 
-    ImGui::SliderFloat("Constant", &m_LightBuffer.constant, 0.f,1.f);
+    ImGui::SliderFloat("Constant", &m_LightBuffer.constant, 0.f, 1.f);
 
-    ImGui::SliderFloat("Linear", &m_LightBuffer.linear, 0.f,1.f);
+    ImGui::SliderFloat("Linear", &m_LightBuffer.linear, 0.f, 1.f);
 
-    ImGui::SliderFloat("Quadratic", &m_LightBuffer.quadratic, 0.f,1.f);
+    ImGui::SliderFloat("Quadratic", &m_LightBuffer.quadratic, 0.f, 1.f);
 
     ImGui::End();
 
@@ -1616,6 +1628,15 @@ void VulkanApp::transitionImageLayout(VkImage image, VkFormat format, VkImageLay
 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout ==
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+
+        sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        destStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else
         throw std::invalid_argument("Unsupported layout transition");
 
@@ -2112,6 +2133,193 @@ void VulkanApp::createSphereGraphicsPipeline()
     vkDestroyShaderModule(m_Device, vertShaderModule, nullptr);
 }
 
+void VulkanApp::createSkyboxGraphicsPipeline()
+{
+    auto vertShaderCode = readFile("../shaders/skybox_vert.spv");
+    auto fragShaderCode = readFile("../shaders/skybox_frag.spv");
+
+    auto vertShaderModule = createShaderModule(vertShaderCode);
+    auto fragShaderModule = createShaderModule(fragShaderCode);
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+    VkVertexInputBindingDescription bindingDescription{};
+
+    bindingDescription.binding = 0;
+    bindingDescription.stride = sizeof(glm::vec3);
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkVertexInputAttributeDescription attributeDescription{};
+
+    attributeDescription.binding = 0;
+    attributeDescription.location = 0;
+    attributeDescription.format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescription.offset = 0;
+
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = 1;
+    vertexInputInfo.pVertexAttributeDescriptions = &attributeDescription;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport{};
+
+    viewport.x = 0.f;
+    viewport.y = 0.f;
+    viewport.width = static_cast<float>(m_SwapChainExtent.width);
+    viewport.height = static_cast<float>(m_SwapChainExtent.height);
+    viewport.minDepth = 0.f;
+    viewport.maxDepth = 1.f;
+
+    VkRect2D scissor{};
+
+    scissor.offset = {0, 0};
+    scissor.extent = m_SwapChainExtent;
+
+    std::vector<VkDynamicState> dynamicStates = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+
+    rasterizer.lineWidth = 1.f;
+
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthBiasConstantFactor = 0.0f;
+    rasterizer.depthBiasClamp = 0.0f;
+    rasterizer.depthBiasSlopeFactor = 0.0f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_TRUE;
+    multisampling.rasterizationSamples = m_MsaaSamples;
+    multisampling.minSampleShading = 1.f;
+    multisampling.pSampleMask = nullptr;
+    multisampling.alphaToCoverageEnable = VK_FALSE;
+    multisampling.alphaToOneEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT
+                                          | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOp = VK_LOGIC_OP_COPY;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.blendConstants[0] = 0.0f;
+    colorBlending.blendConstants[1] = 0.0f;
+    colorBlending.blendConstants[2] = 0.0f;
+    colorBlending.blendConstants[3] = 0.0f;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_FALSE;
+
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f;
+    depthStencil.maxDepthBounds = 1.0f;
+
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &m_SkyboxDescriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+    if (vkCreatePipelineLayout(m_Device, &pipelineLayoutInfo, nullptr, &m_SkyboxPipelineLayout))
+        throw std::runtime_error("Failed to create skybox pipeline layout");
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+
+    pipelineInfo.layout = m_SkyboxPipelineLayout;
+
+    pipelineInfo.renderPass = m_RenderPass;
+    pipelineInfo.subpass = 0;
+
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    if (vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_SkyboxGraphicsPipeline))
+        throw std::runtime_error("Failed to create skybox graphics pipeline");
+
+    vkDestroyShaderModule(m_Device, fragShaderModule, nullptr);
+    vkDestroyShaderModule(m_Device, vertShaderModule, nullptr);
+}
+
 void VulkanApp::createSphereBuffers()
 {
     VkDeviceSize bufferSize = sizeof(m_Sphere.vertices[0]) * m_Sphere.vertices.size();
@@ -2154,6 +2362,74 @@ void VulkanApp::createSphereBuffers()
     vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
 }
 
+void VulkanApp::createSkyboxBuffers()
+{
+    std::vector<float> vertices = {
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f
+    };
+
+    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    void *data;
+    vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, vertices.data(), bufferSize);
+    vkUnmapMemory(m_Device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 m_SkyboxVertexBuffer, m_SkyboxVertexBufferMemory);
+
+    copyBuffer(stagingBuffer, m_SkyboxVertexBuffer, bufferSize);
+    vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
+    vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+}
+
 void VulkanApp::createSphereDescriptorSetLayout()
 {
     VkDescriptorSetLayoutBinding uboBinding{};
@@ -2177,16 +2453,63 @@ void VulkanApp::createSphereDescriptorSetLayout()
     pbrUboBinding.descriptorCount = 1;
     pbrUboBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding bindings[] = {uboBinding, lightUboBinding, pbrUboBinding};
+    VkDescriptorSetLayoutBinding environmentBinding{};
+
+    environmentBinding.binding = 3;
+    environmentBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    environmentBinding.descriptorCount = 1;
+    environmentBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding brdfLutBinding{};
+    brdfLutBinding.binding = 4;
+    brdfLutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    brdfLutBinding.descriptorCount = 1;
+    brdfLutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 5> bindings = {
+        uboBinding, lightUboBinding, pbrUboBinding,
+        environmentBinding, brdfLutBinding
+    };
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
 
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
-    layoutInfo.pBindings = bindings;
+    layoutInfo.bindingCount = bindings.size();
+    layoutInfo.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(m_Device, &layoutInfo, nullptr, &m_SphereDescriptorSetLayout))
         throw std::runtime_error("Failed to create sphere descriptor set layout");
+}
+
+void VulkanApp::createSkyboxDescriptorSetLayout()
+{
+    VkDescriptorSetLayoutBinding uboBinding{};
+
+    uboBinding.binding = 0;
+    uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboBinding.descriptorCount = 1;
+    uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutBinding environmentBinding{};
+
+    environmentBinding.binding = 1;
+    environmentBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    environmentBinding.descriptorCount = 1;
+    environmentBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
+        uboBinding, environmentBinding
+    };
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = bindings.size();
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(m_Device, &layoutInfo, nullptr, &m_SkyboxDescriptorSetLayout))
+        throw std::runtime_error("Failed to create skybox descriptor set layout");
 }
 
 void VulkanApp::createSphereUniformBuffers()
@@ -2242,20 +2565,44 @@ void VulkanApp::updateSphereUniformBuffer(uint32_t currentImage)
 
 void VulkanApp::createSphereDescriptorPool()
 {
-    VkDescriptorPoolSize poolSize{};
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
 
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 3);
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 3);
+
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2);
 
     VkDescriptorPoolCreateInfo poolInfo{};
 
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.poolSizeCount = poolSizes.size();
+    poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
     if (vkCreateDescriptorPool(m_Device, &poolInfo, nullptr, &m_SphereDescriptorPool))
         throw std::runtime_error("Failed to create sphere descriptor pool");
+}
+
+void VulkanApp::createSkyboxDescriptorPool()
+{
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = poolSizes.size();
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+    if (vkCreateDescriptorPool(m_Device, &poolInfo, nullptr, &m_SkyboxDescriptorPool))
+        throw std::runtime_error("Failed to create skybox descriptor pool");
 }
 
 void VulkanApp::createSphereDescriptorSets()
@@ -2294,7 +2641,20 @@ void VulkanApp::createSphereDescriptorSets()
         pbrBufferInfo.offset = 0;
         pbrBufferInfo.range = sizeof(PbrMaterialBuffer);
 
-        std::array<VkWriteDescriptorSet,3> descriptorWrites{};
+        VkDescriptorImageInfo environmentImageInfo{};
+
+        environmentImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        environmentImageInfo.imageView = m_EnvironmentMap.imageView;
+        environmentImageInfo.sampler = m_EnvironmentMap.sampler;
+
+
+        VkDescriptorImageInfo brdfLutImageInfo{};
+
+        brdfLutImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        brdfLutImageInfo.imageView = m_BrdfLutTexture.imageView;
+        brdfLutImageInfo.sampler = m_BrdfLutTexture.sampler;
+
+        std::array<VkWriteDescriptorSet, 5> descriptorWrites{};
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = m_SphereDescriptorSets[i];
@@ -2320,8 +2680,686 @@ void VulkanApp::createSphereDescriptorSets()
         descriptorWrites[2].descriptorCount = 1;
         descriptorWrites[2].pBufferInfo = &pbrBufferInfo;
 
+        descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3].dstSet = m_SphereDescriptorSets[i];
+        descriptorWrites[3].dstBinding = 3;
+        descriptorWrites[3].dstArrayElement = 0;
+        descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[3].descriptorCount = 1;
+        descriptorWrites[3].pImageInfo = &environmentImageInfo;
+
+        descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[4].dstSet = m_SphereDescriptorSets[i];
+        descriptorWrites[4].dstBinding = 4;
+        descriptorWrites[4].dstArrayElement = 0;
+        descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[4].descriptorCount = 1;
+        descriptorWrites[4].pImageInfo = &brdfLutImageInfo;
+
         vkUpdateDescriptorSets(m_Device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
+}
+
+void VulkanApp::createSkyboxDescriptorSets()
+{
+     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_SkyboxDescriptorSetLayout);
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_SkyboxDescriptorPool;
+    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    allocInfo.pSetLayouts = layouts.data();
+
+    m_SkyboxDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+
+    if (vkAllocateDescriptorSets(m_Device, &allocInfo, m_SkyboxDescriptorSets.data()))
+        throw std::runtime_error("Failed to allocate skybox descriptor sets");
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        VkDescriptorBufferInfo bufferInfo{};
+
+        bufferInfo.buffer = m_UniformBuffers[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(MVP);
+
+        VkDescriptorImageInfo environmentImageInfo{};
+
+        environmentImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        environmentImageInfo.imageView = m_EnvironmentMap.imageView;
+        environmentImageInfo.sampler = m_EnvironmentMap.sampler;
+
+
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = m_SkyboxDescriptorSets[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = m_SkyboxDescriptorSets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pImageInfo = &environmentImageInfo;
+
+        vkUpdateDescriptorSets(m_Device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+    }
+}
+
+void VulkanApp::renderMeshMenu(const std::string &title, Mesh &mesh)
+{
+    auto pos = mesh.getPosition();
+
+    auto rot = mesh.getRotation();
+
+    auto sca = mesh.getScale();
+
+
+    ImGui::Begin(title.c_str());
+
+    ImGui::SliderFloat3("Position", glm::value_ptr(pos), -20.f, 20.f);
+
+    ImGui::SliderFloat3("Rotation", glm::value_ptr(rot), 0.f, 360.f);
+
+    ImGui::SliderFloat3("Scale", glm::value_ptr(sca), 0.f, 10.f);
+
+    ImGui::End();
+
+    mesh.setPosition(pos);
+
+    mesh.setRotation(rot);
+
+    mesh.setScale(sca);
+}
+
+void VulkanApp::createIBLResources()
+{
+    std::array<std::string, 6> environmentFaces = {
+        "../skybox/px.jpg",
+        "../skybox/nx.jpg",
+        "../skybox/py.jpg",
+        "../skybox/ny.jpg",
+        "../skybox/pz.jpg",
+        "../skybox/nz.jpg"
+    };
+
+    loadCubemap(environmentFaces, m_EnvironmentMap);
+
+    generateBRDFLUT();
+
+
+    transitionImageLayout(m_BrdfLutTexture.image, VK_FORMAT_R16G16_SFLOAT,
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                          1);
+}
+
+void VulkanApp::loadCubemap(const std::array<std::string, 6> &paths, Texture &cubemap)
+{
+    int width, height, channels;
+    std::array<unsigned char *, 6> pixels;
+
+    for (int i = 0; i < 6; i++)
+    {
+        pixels[i] = stbi_load(paths[i].c_str(), &width, &height, &channels, STBI_rgb_alpha);
+        if (!pixels[i])
+            throw std::runtime_error("Failed to load cubemap face: " + paths[i]);
+    }
+
+    uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+
+    VkDeviceSize imageSize = width * height * 4;
+
+    VkDeviceSize totalSize = imageSize * 6;
+
+    VkBuffer stagingBuffer;
+
+    VkDeviceMemory stagingBufferMemory;
+
+    createBuffer(totalSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    void *data;
+
+    vkMapMemory(m_Device, stagingBufferMemory, 0, totalSize, 0, &data);
+
+    for (int i = 0; i < 6; ++i)
+    {
+        memcpy(static_cast<char *>(data) + (i * imageSize), pixels[i], imageSize);
+        stbi_image_free(pixels[i]);
+    }
+
+    vkUnmapMemory(m_Device, stagingBufferMemory);
+
+    createCubemap(width, mipLevels, VK_FORMAT_R8G8B8A8_SRGB,
+                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                  VK_IMAGE_USAGE_SAMPLED_BIT, cubemap);
+
+    transitionCubemapImageLayout(cubemap.image, VK_FORMAT_R8G8B8A8_SRGB,
+                                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                 mipLevels);
+
+    copyStagingBufferToCubemap(stagingBuffer, cubemap.image, width, height);
+
+    vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
+
+    vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+
+    generateCubemapMipMaps(cubemap.image, VK_FORMAT_R8G8B8A8_SRGB, width, height, mipLevels);
+
+    createCubemapImageView(cubemap, VK_FORMAT_R8G8B8A8_SRGB);
+
+    createCubemapSampler(cubemap);
+}
+
+void VulkanApp::createCubemap(uint32_t size, uint32_t mipLevels, VkFormat format, VkImageUsageFlags usage,
+                              Texture &cubemap)
+{
+    cubemap.mipLevels = mipLevels;
+
+    VkImageCreateInfo imageInfo{};
+
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent = {size, size, 1};
+    imageInfo.mipLevels = mipLevels;
+    imageInfo.arrayLayers = 6;
+    imageInfo.format = format;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+    if (vkCreateImage(m_Device, &imageInfo, nullptr, &cubemap.image))
+        throw std::runtime_error("Failed to create cubemap image");
+
+    VkMemoryRequirements memRequirements;
+
+    vkGetImageMemoryRequirements(m_Device, cubemap.image, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    if (vkAllocateMemory(m_Device, &allocInfo, nullptr, &cubemap.memory))
+        throw std::runtime_error("Failed to allocate cubemap image memory");
+
+
+    vkBindImageMemory(m_Device, cubemap.image, cubemap.memory, 0);
+}
+
+void VulkanApp::createCubemapImageView(Texture &cubemap, VkFormat format)
+{
+    VkImageViewCreateInfo viewInfo{};
+
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = cubemap.image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = cubemap.mipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 6;
+
+    if (vkCreateImageView(m_Device, &viewInfo, nullptr, &cubemap.imageView))
+        throw std::runtime_error("Failed to create cubemap image view");
+}
+
+void VulkanApp::createCubemapSampler(Texture &cubemap)
+{
+    VkSamplerCreateInfo samplerInfo{};
+
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1.0f;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = static_cast<float>(cubemap.mipLevels);
+
+    if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &cubemap.sampler))
+        throw std::runtime_error("Failed to create cubemap sampler");
+}
+
+void VulkanApp::transitionCubemapImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
+                                             VkImageLayout newLayout, uint32_t mipLevels)
+{
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkImageMemoryBarrier barrier{};
+
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = mipLevels;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 6;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+        newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+               newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else
+        throw std::invalid_argument("Unsupported layout transition");
+
+
+    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
+                         0, nullptr, 0, nullptr, 1, &barrier);
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanApp::copyStagingBufferToCubemap(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+{
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    std::array<VkBufferImageCopy, 6> regions{};
+
+    for (uint32_t face = 0; face < 6; face++)
+    {
+        regions[face].bufferOffset = face * width * height * 4;
+        regions[face].bufferRowLength = 0;
+        regions[face].bufferImageHeight = 0;
+        regions[face].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        regions[face].imageSubresource.mipLevel = 0;
+        regions[face].imageSubresource.baseArrayLayer = face;
+        regions[face].imageSubresource.layerCount = 1;
+        regions[face].imageOffset = {0, 0, 0};
+        regions[face].imageExtent = {width, height, 1};
+    }
+
+    vkCmdCopyBufferToImage(commandBuffer, buffer, image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, regions.data());
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanApp::generateCubemapMipMaps(VkImage image, VkFormat imageFormat, int32_t width, int32_t height,
+                                       uint32_t mipLevels)
+{
+    VkFormatProperties formatProperties;
+
+    vkGetPhysicalDeviceFormatProperties(m_PhysicalDevice, imageFormat, &formatProperties);
+
+    if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+        throw std::runtime_error("Texture image format does not support linear blitting");
+
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.image = image;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 6;
+    barrier.subresourceRange.levelCount = 1;
+
+    int32_t mipWidth = width;
+    int32_t mipHeight = height;
+
+    for (uint32_t i = 1; i < mipLevels; i++)
+    {
+        barrier.subresourceRange.baseMipLevel = i - 1;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+        vkCmdPipelineBarrier(commandBuffer,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                             0, nullptr, 0, nullptr, 1, &barrier);
+
+        VkImageBlit blit{};
+        blit.srcOffsets[0] = {0, 0, 0};
+        blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
+        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.srcSubresource.mipLevel = i - 1;
+        blit.srcSubresource.baseArrayLayer = 0;
+        blit.srcSubresource.layerCount = 6;
+        blit.dstOffsets[0] = {0, 0, 0};
+        blit.dstOffsets[1] = {mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1};
+        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.dstSubresource.mipLevel = i;
+        blit.dstSubresource.baseArrayLayer = 0;
+        blit.dstSubresource.layerCount = 6;
+
+        vkCmdBlitImage(commandBuffer,
+                       image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                       image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                       1, &blit, VK_FILTER_LINEAR);
+
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(commandBuffer,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                             0, nullptr, 0, nullptr, 1, &barrier);
+
+        if (mipWidth > 1) mipWidth /= 2;
+        if (mipHeight > 1) mipHeight /= 2;
+    }
+
+    barrier.subresourceRange.baseMipLevel = mipLevels - 1;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(commandBuffer,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                         0, nullptr, 0, nullptr, 1, &barrier);
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanApp::generateBRDFLUT()
+{
+    uint32_t lutSize = 512;
+
+    createImage(lutSize, lutSize, 1, VK_SAMPLE_COUNT_1_BIT,
+                VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                m_BrdfLutTexture.image, m_BrdfLutTexture.memory);
+
+    m_BrdfLutTexture.imageView = createImageView(m_BrdfLutTexture.image,
+                                                 VK_FORMAT_R16G16_SFLOAT,
+                                                 VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+    createBRDFLUTSampler();
+
+    createBRDFLUTRenderPass();
+
+    createBRDFLUTFramebuffer(lutSize);
+
+    createBRDFLUTPipeline();
+
+    renderBRDFLUT(lutSize);
+}
+
+void VulkanApp::createBRDFLUTSampler()
+{
+    VkSamplerCreateInfo samplerInfo{};
+
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1.0f;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 1.0f;
+
+    if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &m_BrdfLutTexture.sampler))
+        throw std::runtime_error("Failed to create BRDF LUT sampler");
+}
+
+void VulkanApp::createBRDFLUTRenderPass()
+{
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = VK_FORMAT_R16G16_SFLOAT;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    if (vkCreateRenderPass(m_Device, &renderPassInfo, nullptr, &m_BrdfLutRenderPass))
+        throw std::runtime_error("Failed to create BRDF LUT render pass");
+}
+
+void VulkanApp::createBRDFLUTFramebuffer(uint32_t size)
+{
+    VkFramebufferCreateInfo framebufferInfo{};
+
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = m_BrdfLutRenderPass;
+    framebufferInfo.attachmentCount = 1;
+    framebufferInfo.pAttachments = &m_BrdfLutTexture.imageView;
+    framebufferInfo.width = size;
+    framebufferInfo.height = size;
+    framebufferInfo.layers = 1;
+
+    if (vkCreateFramebuffer(m_Device, &framebufferInfo, nullptr, &m_BrdfLutFramebuffer))
+        throw std::runtime_error("Failed to create BRDF LUT framebuffer");
+}
+
+void VulkanApp::createBRDFLUTPipeline()
+{
+    auto vertShaderCode = readFile("../shaders/brdf_lut_vert.spv");
+    auto fragShaderCode = readFile("../shaders/brdf_lut_frag.spv");
+
+    auto vertShaderModule = createShaderModule(vertShaderCode);
+    auto fragShaderModule = createShaderModule(fragShaderCode);
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = 512.0f;
+    viewport.height = 512.0f;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {512, 512};
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOp = VK_LOGIC_OP_COPY;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 0;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+
+    if (vkCreatePipelineLayout(m_Device, &pipelineLayoutInfo, nullptr, &m_BrdfLutGraphicsPipelineLayout))
+        throw std::runtime_error("Failed to create BRDF LUT pipeline layout");
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.layout = m_BrdfLutGraphicsPipelineLayout;
+    pipelineInfo.renderPass = m_BrdfLutRenderPass;
+    pipelineInfo.subpass = 0;
+
+    if (vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_BrdfLutGraphicsPipeline))
+        throw std::runtime_error("Failed to create BRDF LUT graphics pipeline");
+
+    vkDestroyShaderModule(m_Device, fragShaderModule, nullptr);
+    vkDestroyShaderModule(m_Device, vertShaderModule, nullptr);
+}
+
+void VulkanApp::renderBRDFLUT(uint32_t size)
+{
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = m_BrdfLutRenderPass;
+    renderPassInfo.framebuffer = m_BrdfLutFramebuffer;
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = {size, size};
+
+    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_BrdfLutGraphicsPipeline);
+
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanApp::cleanupBRDFLUTResources()
+{
+    vkDestroyFramebuffer(m_Device, m_BrdfLutFramebuffer, nullptr);
+
+    vkDestroyPipeline(m_Device, m_BrdfLutGraphicsPipeline, nullptr);
+
+    vkDestroyPipelineLayout(m_Device, m_BrdfLutGraphicsPipelineLayout, nullptr);
+
+    vkDestroyRenderPass(m_Device, m_BrdfLutRenderPass, nullptr);
+}
+
+void VulkanApp::destroyTexture(Texture &texture)
+{
+    vkDestroySampler(m_Device, texture.sampler, nullptr);
+
+    vkDestroyImageView(m_Device, texture.imageView, nullptr);
+
+    vkDestroyImage(m_Device, texture.image, nullptr);
+
+    vkFreeMemory(m_Device, texture.memory, nullptr);
 }
 
 VulkanApp::VulkanApp()
@@ -2364,9 +3402,13 @@ VulkanApp::VulkanApp()
 
     createSphereDescriptorSetLayout();
 
+    createSkyboxDescriptorSetLayout();
+
     createGraphicsPipeline();
 
     createSphereGraphicsPipeline();
+
+    createSkyboxGraphicsPipeline();
 
     createCommandPool();
 
@@ -2389,7 +3431,7 @@ VulkanApp::VulkanApp()
 
     m_Backpack.rotate({90.f, 180.f, 0.f});
 
-    m_Sphere.generateSphere(1.f, 32, 32);
+    m_Sphere.generateSphere(1.f, 128, 128);
 
     m_Sphere.move({2.f, 0.f, 0.f});
 
@@ -2399,7 +3441,11 @@ VulkanApp::VulkanApp()
 
     createVertexBuffer();
 
+    createIBLResources();
+
     createSphereBuffers();
+
+    createSkyboxBuffers();
 
     createIndexBuffer();
 
@@ -2411,9 +3457,13 @@ VulkanApp::VulkanApp()
 
     createSphereDescriptorPool();
 
+    createSkyboxDescriptorPool();
+
     createDescriptorSets();
 
     createSphereDescriptorSets();
+
+    createSkyboxDescriptorSets();
 
     createImGuiDescriptorPool();
 
@@ -2456,6 +3506,9 @@ void VulkanApp::run()
         drawFrame();
 
         glfwPollEvents();
+
+        if (glfwGetKey(m_Window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+            glfwSetWindowShouldClose(m_Window, true);
     }
 
     vkDeviceWaitIdle(m_Device);
@@ -2473,6 +3526,12 @@ VulkanApp::~VulkanApp()
 
         vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
     }
+
+    destroyTexture(m_EnvironmentMap);
+
+    destroyTexture(m_BrdfLutTexture);
+
+    cleanupBRDFLUTResources();
 
     for (auto &texture: m_ModelTextures)
     {
@@ -2523,7 +3582,13 @@ VulkanApp::~VulkanApp()
 
     vkDestroyDescriptorPool(m_Device, m_SphereDescriptorPool, nullptr);
 
+    vkDestroyDescriptorPool(m_Device, m_SkyboxDescriptorPool, nullptr);
+
     vkDestroyDescriptorSetLayout(m_Device, m_SphereDescriptorSetLayout, nullptr);
+
+    vkDestroyDescriptorSetLayout(m_Device, m_SkyboxDescriptorSetLayout, nullptr);
+
+    vkDestroyDescriptorSetLayout(m_Device, m_DescriptorSetLayout, nullptr);
 
     vkDestroyBuffer(m_Device, m_SphereVertexBuffer, nullptr);
 
@@ -2533,9 +3598,11 @@ VulkanApp::~VulkanApp()
 
     vkFreeMemory(m_Device, m_SphereIndexBufferMemory, nullptr);
 
-    vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
+    vkDestroyBuffer(m_Device, m_SkyboxVertexBuffer, nullptr);
 
-    vkDestroyDescriptorSetLayout(m_Device, m_DescriptorSetLayout, nullptr);
+    vkFreeMemory(m_Device, m_SkyboxVertexBufferMemory, nullptr);
+
+    vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
 
     vkDestroyBuffer(m_Device, m_VertexBuffer, nullptr);
 
@@ -2551,9 +3618,13 @@ VulkanApp::~VulkanApp()
 
     vkDestroyPipeline(m_Device, m_SphereGraphicsPipeline, nullptr);
 
+    vkDestroyPipeline(m_Device, m_SkyboxGraphicsPipeline, nullptr);
+
     vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
 
     vkDestroyPipelineLayout(m_Device, m_SpherePipelineLayout, nullptr);
+
+    vkDestroyPipelineLayout(m_Device, m_SkyboxPipelineLayout, nullptr);
 
     vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
 

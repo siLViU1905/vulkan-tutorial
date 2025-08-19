@@ -34,6 +34,8 @@ add_executable(vulkan
         include/imgui/imgui_impl_vulkan.cpp
         app/LightBuffer.cpp
         app/PbrMaterialBuffer.cpp
+        app/Camera.cpp
+        app/Camera.h
 )
 
 target_link_libraries(vulkan

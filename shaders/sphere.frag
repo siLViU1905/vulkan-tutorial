@@ -32,15 +32,20 @@ light;
 
 layout(binding = 2) uniform PbrMaterial
 {
-    vec4 metalness;
+    float metalness;
 
-    vec4 roughness;
+    float roughness;
 
-    vec4 ao;
+    float ao;
 }
 material;
 
+layout(binding = 3) uniform samplerCube environmentMap;
+layout(binding = 4) uniform sampler2D brdfLUT;
+
 const float PI = 3.14159265359;
+
+const float MAX_REFL_LOD = 4.0;
 
 float distributionGGX(vec3 N, vec3 H, float roughness)
 {
@@ -82,20 +87,30 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) 
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 void main()
 {
 
     vec3 albedo = fragColor;
 
-    float metallic = material.metalness.r;
+    float metallic = material.metalness;
 
-    float roughness = material.roughness.r;
+    float roughness = material.roughness;
 
-    float ao = material.ao.r;
+    float ao = material.ao;
+
 
     vec3 N = normalize(fragNormal);
 
     vec3 V = normalize(viewPos - fragPos);
+
+    vec3 R = reflect(-V, N);
+
+    
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
@@ -122,11 +137,30 @@ void main()
     vec3 kD = vec3(1.0) - kS;
 
     kD *= 1.0 - metallic;
+
     float NdotL = max(dot(N, L), 0.0);
 
     Lo += (kD * albedo / PI + specular) * radiance * NdotL;
 
-    vec3 ambient = light.ambient * albedo * ao;
+    vec3 F_ibl = fresnelSchlickRoughness(max(dot(N,V),0.0), F0, roughness);
+
+    vec3 kS_ibl = F_ibl;
+
+    vec3 kD_ibl = 1.0 - kS_ibl;
+
+    kD_ibl *= 1.0 - metallic;
+
+    vec3 irradiance = texture(environmentMap, N).rgb;
+
+    vec3 diffuse_ibl = irradiance * albedo;
+
+    vec3 prefilteredColor = textureLod(environmentMap, R, roughness * MAX_REFL_LOD).rgb;
+
+    vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+
+    vec3 specular_ibl = prefilteredColor * (F_ibl * brdf.x + brdf.y);
+
+    vec3 ambient = (kD_ibl * diffuse_ibl + specular_ibl) * ao;
 
     vec3 color = ambient + Lo;
 
