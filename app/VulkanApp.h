@@ -14,6 +14,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "Camera.h"
 #include "Mesh.h"
 #include "Texture.h"
 #include "Vertex.h"
@@ -231,6 +232,8 @@ class VulkanApp
     VkDescriptorPool m_SkyboxDescriptorPool;
 
     std::vector<VkDescriptorSet> m_SkyboxDescriptorSets;
+
+    Camera* m_Camera;
 
     //methods
     void enumerateAvailableExtensions();

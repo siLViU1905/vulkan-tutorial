@@ -35,7 +35,6 @@ add_executable(vulkan
         app/LightBuffer.cpp
         app/PbrMaterialBuffer.cpp
         app/Camera.cpp
-        app/Camera.h
 )
 
 target_link_libraries(vulkan

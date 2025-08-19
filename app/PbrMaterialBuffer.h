@@ -6,6 +6,8 @@ struct PbrMaterialBuffer
 {
     PbrMaterialBuffer();
 
+    glm::vec4 m_Albedo;
+
     float m_Metalness;
 
     float m_Roughness;

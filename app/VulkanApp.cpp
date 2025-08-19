@@ -879,7 +879,7 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SkyboxPipelineLayout, 0, 1,
                             &m_SkyboxDescriptorSets[currentFrame], 0, nullptr);
 
-    vkCmdDraw(commandBuffer, 36, 1,0,0);
+    vkCmdDraw(commandBuffer, 36, 1, 0, 0);
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
 
@@ -963,6 +963,8 @@ void VulkanApp::drawFrame()
     renderMeshMenu("Backpack", m_Backpack);
 
     ImGui::Begin("Pbr Buffer");
+
+    ImGui::ColorPicker3("Albedo", glm::value_ptr(m_PbrBuffer.m_Albedo));
 
     ImGui::SliderFloat("Metalness", &m_PbrBuffer.m_Metalness, 0.f, 1.f);
 
@@ -1326,11 +1328,9 @@ void VulkanApp::updateUniformBuffer(uint32_t currentImage)
 {
     MVP ubo;
 
-    ubo.view = glm::lookAt(glm::vec3(0.f, 5.f, 0.f), glm::vec3(0.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.view = m_Camera->m_View;
 
-    ubo.projection = glm::perspective(glm::radians(45.f),
-                                      m_SwapChainExtent.width / static_cast<float>(m_SwapChainExtent.height), 0.1f,
-                                      10.f);
+    ubo.projection = m_Camera->m_Projection;
 
     ubo.projection[1][1] = -ubo.projection[1][1];
 
@@ -2365,47 +2365,47 @@ void VulkanApp::createSphereBuffers()
 void VulkanApp::createSkyboxBuffers()
 {
     std::vector<float> vertices = {
-        -1.0f,  1.0f, -1.0f,
+        -1.0f, 1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
-         1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, 1.0f, -1.0f,
+        -1.0f, 1.0f, -1.0f,
 
-        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, 1.0f,
         -1.0f, -1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f,  1.0f,
-        -1.0f, -1.0f,  1.0f,
+        -1.0f, 1.0f, -1.0f,
+        -1.0f, 1.0f, -1.0f,
+        -1.0f, 1.0f, 1.0f,
+        -1.0f, -1.0f, 1.0f,
 
-         1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
 
-        -1.0f, -1.0f,  1.0f,
-        -1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f, -1.0f,  1.0f,
-        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, 1.0f,
+        -1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, -1.0f, 1.0f,
+        -1.0f, -1.0f, 1.0f,
 
-        -1.0f,  1.0f, -1.0f,
-         1.0f,  1.0f, -1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-        -1.0f,  1.0f,  1.0f,
-        -1.0f,  1.0f, -1.0f,
+        -1.0f, 1.0f, -1.0f,
+        1.0f, 1.0f, -1.0f,
+        1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f,
+        -1.0f, 1.0f, 1.0f,
+        -1.0f, 1.0f, -1.0f,
 
         -1.0f, -1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,
-         1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,
-         1.0f, -1.0f,  1.0f
+        -1.0f, -1.0f, 1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f, 1.0f,
+        1.0f, -1.0f, 1.0f
     };
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -2546,11 +2546,9 @@ void VulkanApp::updateSphereUniformBuffer(uint32_t currentImage)
 {
     MVP ubo;
 
-    ubo.view = glm::lookAt(glm::vec3(0.f, 5.f, 0.f), glm::vec3(0.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.view = m_Camera->m_View;
 
-    ubo.projection = glm::perspective(glm::radians(45.f),
-                                      m_SwapChainExtent.width / static_cast<float>(m_SwapChainExtent.height), 0.1f,
-                                      10.f);
+    ubo.projection = m_Camera->m_Projection;
 
     ubo.projection[1][1] = -ubo.projection[1][1];
 
@@ -2702,7 +2700,7 @@ void VulkanApp::createSphereDescriptorSets()
 
 void VulkanApp::createSkyboxDescriptorSets()
 {
-     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_SkyboxDescriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_SkyboxDescriptorSetLayout);
 
     VkDescriptorSetAllocateInfo allocInfo{};
 
@@ -3380,6 +3378,8 @@ VulkanApp::VulkanApp()
 
     glfwSetFramebufferSizeCallback(m_Window, framebufferCallback);
 
+    m_Camera = new Camera(m_Window, glm::vec3(0.f, 5.f, 0.f), 5.f);
+
     enumerateAvailableExtensions();
 
     createInstance();
@@ -3507,8 +3507,27 @@ void VulkanApp::run()
 
         glfwPollEvents();
 
+        m_Camera->updateMovement();
+
+        m_Camera->updateLookAt();
+
+        if (WINDOW_RESIZED)
+            m_Camera->updateProjection();
+
         if (glfwGetKey(m_Window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(m_Window, true);
+
+        if (glfwGetKey(m_Window, GLFW_KEY_C))
+        {
+            glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            m_Camera->gainFocus();
+        }
+
+        if (glfwGetKey(m_Window, GLFW_KEY_R))
+        {
+            glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            m_Camera->loseFocus();
+        }
     }
 
     vkDeviceWaitIdle(m_Device);
@@ -3635,6 +3654,8 @@ VulkanApp::~VulkanApp()
     vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
 
     vkDestroyInstance(m_Instance, nullptr);
+
+    delete m_Camera;
 
     glfwDestroyWindow(m_Window);
 

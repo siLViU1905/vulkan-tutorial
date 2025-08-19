@@ -32,6 +32,8 @@ light;
 
 layout(binding = 2) uniform PbrMaterial
 {
+    vec4 albedo;
+
     float metalness;
 
     float roughness;
@@ -95,7 +97,7 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 void main()
 {
 
-    vec3 albedo = fragColor;
+    vec3 albedo = material.albedo.rgb;
 
     float metallic = material.metalness;
 
