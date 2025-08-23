@@ -88,7 +88,7 @@ private:
 
     std::vector<uint32_t> m_Indices;
 
-    //std::unordered_map<Vertex, uint32_t> m_UniqueVertices;
+    std::unordered_map<Vertex, uint32_t> m_UniqueVertices;
 
     void updateModel();
 

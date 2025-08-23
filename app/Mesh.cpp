@@ -41,31 +41,32 @@ void Mesh::load(const std::string &path)
         {
             Vertex vertex;
 
-            vertex.position = {
+            vertex.m_Position = {
                 attrib.vertices[3 * index.vertex_index],
                 attrib.vertices[3 * index.vertex_index + 1],
                 attrib.vertices[3 * index.vertex_index + 2]
             };
 
-            vertex.texCoords = {
+            vertex.m_TexCoords = {
                 attrib.texcoords[2 * index.texcoord_index],
                 attrib.texcoords[2 * index.texcoord_index + 1]
             };
 
             if (index.normal_index >= 0 && !attrib.normals.empty())
-                vertex.normal = {
+                vertex.m_Normal = {
                     attrib.normals[3 * index.normal_index],
                     attrib.normals[3 * index.normal_index + 1],
                     attrib.normals[3 * index.normal_index + 2]
                 };
 
 
-            vertex.color = {1.0f, 1.0f, 1.0f};
+           if (!m_UniqueVertices.contains(vertex))
+           {
+               m_UniqueVertices[vertex] = static_cast<uint32_t>(m_Vertices.size());
+               m_Vertices.push_back(vertex);
+           }
 
-            m_Vertices.push_back(vertex);
-
-
-            m_Indices.push_back(m_Indices.size());
+            m_Indices.push_back(m_UniqueVertices[vertex]);
         }
 
     calculateTangents();
@@ -92,17 +93,17 @@ void Mesh::generateSphere(float radius, int stacks, int slices)
             Vertex vertex;
 
 
-            vertex.position.x = ringRadius * std::cos(theta);
-            vertex.position.y = y;
-            vertex.position.z = ringRadius * std::sin(theta);
+            vertex.m_Position.x = ringRadius * std::cos(theta);
+            vertex.m_Position.y = y;
+            vertex.m_Position.z = ringRadius * std::sin(theta);
 
 
-            glm::vec3 normal = glm::normalize(vertex.position);
-            vertex.normal = normal;
+            glm::vec3 normal = glm::normalize(vertex.m_Position);
+            vertex.m_Normal = normal;
 
 
-            vertex.texCoords.x = static_cast<float>(j) / static_cast<float>(slices);
-            vertex.texCoords.y = static_cast<float>(i) / static_cast<float>(stacks);
+            vertex.m_TexCoords.x = static_cast<float>(j) / static_cast<float>(slices);
+            vertex.m_TexCoords.y = static_cast<float>(i) / static_cast<float>(stacks);
 
 
             glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -114,8 +115,7 @@ void Mesh::generateSphere(float radius, int stacks, int slices)
                 tangent = glm::normalize(tangent);
 
 
-            vertex.tangent = tangent;
-            vertex.color = glm::vec3(1.0f, 1.0f, 1.0f);
+            vertex.m_Tangent = tangent;
 
             m_Vertices.push_back(vertex);
         }
@@ -332,7 +332,7 @@ void Mesh::createIndexBuffer()
 void Mesh::calculateTangents()
 {
     for (auto &vertex: m_Vertices)
-        vertex.tangent = glm::vec3(0.f);
+        vertex.m_Tangent = glm::vec3(0.f);
 
     for (size_t i = 0; i < m_Indices.size(); i += 3)
     {
@@ -344,11 +344,11 @@ void Mesh::calculateTangents()
         Vertex &v1 = m_Vertices[i1];
         Vertex &v2 = m_Vertices[i2];
 
-        glm::vec3 edge1 = v1.position - v0.position;
-        glm::vec3 edge2 = v2.position - v0.position;
+        glm::vec3 edge1 = v1.m_Position - v0.m_Position;
+        glm::vec3 edge2 = v2.m_Position - v0.m_Position;
 
-        glm::vec2 deltaUV1 = v1.texCoords - v0.texCoords;
-        glm::vec2 deltaUV2 = v2.texCoords - v0.texCoords;
+        glm::vec2 deltaUV1 = v1.m_TexCoords - v0.m_TexCoords;
+        glm::vec2 deltaUV2 = v2.m_TexCoords - v0.m_TexCoords;
 
         float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
 
@@ -357,23 +357,23 @@ void Mesh::calculateTangents()
         tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
         tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
 
-        v0.tangent += tangent;
-        v1.tangent += tangent;
-        v2.tangent += tangent;
+        v0.m_Tangent += tangent;
+        v1.m_Tangent += tangent;
+        v2.m_Tangent += tangent;
     }
 
     for (auto &vertex: m_Vertices)
     {
-        if (glm::length(vertex.tangent) > 0.0001f)
+        if (glm::length(vertex.m_Tangent) > 0.0001f)
         {
-            vertex.tangent = glm::normalize(vertex.tangent - vertex.normal * glm::dot(vertex.normal, vertex.tangent));
+            vertex.m_Tangent = glm::normalize(vertex.m_Tangent - vertex.m_Normal * glm::dot(vertex.m_Normal, vertex.m_Tangent));
         } else
         {
             glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-            vertex.tangent = glm::normalize(glm::cross(up, vertex.normal));
-            if (glm::length(vertex.tangent) < 0.001f)
+            vertex.m_Tangent = glm::normalize(glm::cross(up, vertex.m_Normal));
+            if (glm::length(vertex.m_Tangent) < 0.001f)
             {
-                vertex.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+                vertex.m_Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
             }
         }
     }

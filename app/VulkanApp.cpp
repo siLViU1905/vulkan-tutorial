@@ -3528,7 +3528,7 @@ VulkanApp::VulkanApp()
 
     currentFrame = 0;
 
-    // m_Backpack.load("../models/backpack/backpack.obj");
+     //m_Backpack.load("../models/backpack/backpack.obj");
 
     glfwSetFramebufferSizeCallback(m_Window, framebufferCallback);
 
@@ -3596,6 +3596,8 @@ VulkanApp::VulkanApp()
     m_Sphere.generateSphere(1.f, 128, 128);
 
     m_Sphere.move({2.f, 0.f, 0.f});
+
+    m_Sphere.scale( glm::vec3(2.6f));
 
     //createModelImageViews();
 
