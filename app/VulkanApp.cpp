@@ -12,6 +12,8 @@
 #include "Vertex.h"
 #include "MVP.h"
 #define STB_IMAGE_IMPLEMENTATION
+#include <thread>
+
 #include "../include/stb_image.h"
 #include "../include/glm/gtc/type_ptr.hpp"
 
@@ -866,22 +868,9 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
     renderPassInfo.clearValueCount = clearValues.size();
     renderPassInfo.pClearValues = clearValues.data();
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
-    VkDeviceSize offsets[] = {0};
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SkyboxGraphicsPipeline);
-
-    VkBuffer skyboxVertexBuffers[] = {m_SkyboxVertexBuffer};
-
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, skyboxVertexBuffers, offsets);
-
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SkyboxPipelineLayout, 0, 1,
-                            &m_SkyboxDescriptorSets[currentFrame], 0, nullptr);
-
-    vkCmdDraw(commandBuffer, 36, 1, 0, 0);
-
-    VkViewport viewport{};
+    /*VkViewport viewport{};
 
     viewport.x = 0.f;
     viewport.y = 0.f;
@@ -895,39 +884,11 @@ void VulkanApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imag
     VkRect2D scissor{};
 
     scissor.offset = {0, 0};
-    scissor.extent = m_SwapChainExtent;
+    scissor.extent = m_SwapChainExtent;*
 
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);*/
 
-    VkBuffer vertexBuffers[] = {m_VertexBuffer};
-
-    /*vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
-
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-    vkCmdBindIndexBuffer(commandBuffer, m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1,
-                            &m_DescriptorSets[currentFrame], 0, nullptr);
-
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_Backpack.indices.size()), 1, 0, 0, 0);*/
-
-
-    //sphere
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SphereGraphicsPipeline);
-
-    VkBuffer sphereVertexBuffers[] = {m_Sphere.getVertexBuffer()};
-
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, sphereVertexBuffers, offsets);
-
-    vkCmdBindIndexBuffer(commandBuffer, m_Sphere.getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SpherePipelineLayout, 0, 1,
-                            &m_SphereDescriptorSets[currentFrame], 0, nullptr);
-
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_Sphere.getIndices().size()), 1, 0, 0, 0);
-
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    vkCmdExecuteCommands(commandBuffer, m_SecondaryCommandBuffers.size(), m_SecondaryCommandBuffers.data());
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -965,7 +926,7 @@ void VulkanApp::drawFrame()
 
     renderMeshMenu("Sphere", m_Sphere);
 
-    renderMeshMenu("Backpack", m_Backpack);
+    //renderMeshMenu("Backpack", m_Backpack);
 
     ImGui::Begin("Pbr Buffer");
 
@@ -1004,6 +965,49 @@ void VulkanApp::drawFrame()
     updateUniformBuffer(currentFrame);
 
     updateSphereUniformBuffer(currentFrame);
+
+    /*if (!m_SecondaryCommandBuffers.empty())
+    {
+        vkFreeCommandBuffers(m_Device, m_SkyboxCommandPool, 1, &m_SecondaryCommandBuffers[0]);
+        vkFreeCommandBuffers(m_Device, m_SphereCommandPool, 1, &m_SecondaryCommandBuffers[1]);
+        vkFreeCommandBuffers(m_Device, m_CommandPool, 1, &m_SecondaryCommandBuffers[2]);
+        m_SecondaryCommandBuffers.clear();
+    }*/
+
+    vkResetCommandPool(m_Device, m_SkyboxCommandPool, 0);
+    vkResetCommandPool(m_Device, m_SphereCommandPool, 0);
+    vkResetCommandPool(m_Device, m_CommandPool, 0);
+
+    m_SecondaryCommandBuffers.resize(3);
+
+    VkCommandBufferAllocateInfo allocInfo{};
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+    allocInfo.commandBufferCount = 1;
+
+    allocInfo.commandPool = m_SkyboxCommandPool;
+
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[0]))
+        throw std::runtime_error("Failed to allocate secondary command buffer for skybox");
+
+    allocInfo.commandPool = m_SphereCommandPool;
+
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[1]))
+        throw std::runtime_error("Failed to allocate secondary command buffer for sphere");
+
+    allocInfo.commandPool = m_CommandPool;
+
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[2]))
+        throw std::runtime_error("Failed to allocate secondary command buffer for ImGui");
+
+    std::thread skyboxThread(&VulkanApp::recordSkyboxCommands, this, m_SecondaryCommandBuffers[0]);
+    std::thread sphereThread(&VulkanApp::recordSphereCommands, this, m_SecondaryCommandBuffers[1]);
+
+    recordImGuiCommands(m_SecondaryCommandBuffers[2]);
+
+    skyboxThread.join();
+    sphereThread.join();
 
     vkResetFences(m_Device, 1, &m_SwapChainFences[currentFrame]);
 
@@ -1049,6 +1053,14 @@ void VulkanApp::drawFrame()
 
     result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
 
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || WINDOW_RESIZED)
+    {
+        WINDOW_RESIZED = false;
+        recreateSwapChain();
+    } else if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to present swap chain image");
+    }
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
@@ -1075,7 +1087,7 @@ void VulkanApp::createSyncObjects()
         )
             throw std::runtime_error("Failed to create semaphores");
 
-    for (size_t i =0;i<m_SwapChainImages.size();++i)
+    for (size_t i = 0; i < m_SwapChainImages.size(); ++i)
         if (vkCreateFence(m_Device, &fenceInfo, nullptr, &m_SwapChainFences[i]))
             throw std::runtime_error("Failed to create fences for swapchain images");
 }
@@ -3364,6 +3376,170 @@ void VulkanApp::destroyTexture(Texture &texture)
     vkFreeMemory(m_Device, texture.memory, nullptr);
 }
 
+void VulkanApp::createCommandPoolsForAsync()
+{
+    auto queueFamilyIndices = findQueueFamilies(m_PhysicalDevice);
+
+    VkCommandPoolCreateInfo poolInfo{};
+
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+    if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_SkyboxCommandPool))
+        throw std::runtime_error("Failed to create skybox command pool");
+
+    if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_SphereCommandPool))
+        throw std::runtime_error("Failed to create sphere command pool");
+}
+
+void VulkanApp::recordSkyboxCommands(VkCommandBuffer secondaryBuffer)
+{
+    VkCommandBufferInheritanceInfo inheritanceInfo{};
+
+    inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+    inheritanceInfo.renderPass = m_RenderPass;
+    inheritanceInfo.subpass = 0;
+    inheritanceInfo.framebuffer = VK_NULL_HANDLE;
+    inheritanceInfo.occlusionQueryEnable = VK_FALSE;
+
+    VkCommandBufferBeginInfo beginInfo{};
+
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.pInheritanceInfo = &inheritanceInfo;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+
+    if (vkBeginCommandBuffer(secondaryBuffer, &beginInfo))
+        throw std::runtime_error("Failed to begin skybox command buffer");
+
+    VkViewport viewport{};
+    viewport.x = 0.f;
+    viewport.y = 0.f;
+    viewport.width = static_cast<float>(m_SwapChainExtent.width);
+    viewport.height = static_cast<float>(m_SwapChainExtent.height);
+    viewport.minDepth = 0.f;
+    viewport.maxDepth = 1.f;
+
+    vkCmdSetViewport(secondaryBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = m_SwapChainExtent;
+
+    vkCmdSetScissor(secondaryBuffer, 0, 1, &scissor);
+
+    VkDeviceSize offsets[] = {0};
+
+    vkCmdBindPipeline(secondaryBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SkyboxGraphicsPipeline);
+
+    VkBuffer vertexBuffers[] = {m_SkyboxVertexBuffer};
+
+    vkCmdBindVertexBuffers(secondaryBuffer, 0, 1, vertexBuffers, offsets);
+
+    vkCmdBindDescriptorSets(secondaryBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_SkyboxPipelineLayout, 0, 1,
+                            &m_SkyboxDescriptorSets[currentFrame], 0, nullptr);
+
+    vkCmdDraw(secondaryBuffer, 36, 1, 0, 0);
+
+    if (vkEndCommandBuffer(secondaryBuffer))
+        throw std::runtime_error("Failed to end skybox command buffer");
+}
+
+void VulkanApp::recordSphereCommands(VkCommandBuffer secondaryBuffer)
+{
+    VkCommandBufferInheritanceInfo inheritanceInfo{};
+
+    inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+    inheritanceInfo.renderPass = m_RenderPass;
+    inheritanceInfo.subpass = 0;
+    inheritanceInfo.framebuffer = VK_NULL_HANDLE;
+    inheritanceInfo.occlusionQueryEnable = VK_FALSE;
+
+    VkCommandBufferBeginInfo beginInfo{};
+
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.pInheritanceInfo = &inheritanceInfo;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+
+    if (vkBeginCommandBuffer(secondaryBuffer, &beginInfo))
+        throw std::runtime_error("Failed to begin sphere command buffer");
+
+    VkViewport viewport{};
+    viewport.x = 0.f;
+    viewport.y = 0.f;
+    viewport.width = static_cast<float>(m_SwapChainExtent.width);
+    viewport.height = static_cast<float>(m_SwapChainExtent.height);
+    viewport.minDepth = 0.f;
+    viewport.maxDepth = 1.f;
+
+    vkCmdSetViewport(secondaryBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = m_SwapChainExtent;
+
+    vkCmdSetScissor(secondaryBuffer, 0, 1, &scissor);
+
+    VkDeviceSize offsets[] = {0};
+
+    vkCmdBindPipeline(secondaryBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_SphereGraphicsPipeline);
+
+    VkBuffer vertexBuffers[] = {m_Sphere.getVertexBuffer()};
+
+    vkCmdBindVertexBuffers(secondaryBuffer, 0, 1, vertexBuffers, offsets);
+
+    vkCmdBindIndexBuffer(secondaryBuffer, m_Sphere.getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdBindDescriptorSets(secondaryBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_SpherePipelineLayout, 0, 1,
+                            &m_SphereDescriptorSets[currentFrame], 0, nullptr);
+
+    vkCmdDrawIndexed(secondaryBuffer, m_Sphere.getIndices().size(), 1, 0, 0, 0);
+
+    if (vkEndCommandBuffer(secondaryBuffer))
+        throw std::runtime_error("Failed to end sphere command buffer");
+}
+
+void VulkanApp::recordImGuiCommands(VkCommandBuffer secondaryBuffer)
+{
+    VkCommandBufferInheritanceInfo inheritanceInfo{};
+
+    inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+    inheritanceInfo.renderPass = m_RenderPass;
+    inheritanceInfo.subpass = 0;
+    inheritanceInfo.framebuffer = VK_NULL_HANDLE;
+
+    VkCommandBufferBeginInfo beginInfo{};
+
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    beginInfo.pInheritanceInfo = &inheritanceInfo;
+
+    vkBeginCommandBuffer(secondaryBuffer, &beginInfo);
+
+
+    VkViewport viewport{};
+
+    viewport.width = static_cast<float>(m_SwapChainExtent.width);
+    viewport.height = static_cast<float>(m_SwapChainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    vkCmdSetViewport(secondaryBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+
+    scissor.offset = {0, 0};
+    scissor.extent = m_SwapChainExtent;
+
+    vkCmdSetScissor(secondaryBuffer, 0, 1, &scissor);
+
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), secondaryBuffer);
+
+    vkEndCommandBuffer(secondaryBuffer);
+}
+
 VulkanApp::VulkanApp()
 {
     if (!glfwInit())
@@ -3378,7 +3554,7 @@ VulkanApp::VulkanApp()
 
     currentFrame = 0;
 
-   // m_Backpack.load("../models/backpack/backpack.obj");
+    // m_Backpack.load("../models/backpack/backpack.obj");
 
     glfwSetFramebufferSizeCallback(m_Window, framebufferCallback);
 
@@ -3416,6 +3592,8 @@ VulkanApp::VulkanApp()
 
     createCommandPool();
 
+    createCommandPoolsForAsync();
+
     createColorResources();
 
     createDepthResources();
@@ -3431,7 +3609,7 @@ VulkanApp::VulkanApp()
         "../models/backpack/roughness.jpg", "../models/backpack/ao.jpg", "../models/backpack/specular.jpg"
     });*/
 
-   m_Sphere.setDevice(m_Device);
+    m_Sphere.setDevice(m_Device);
 
     m_Sphere.setPhysicalDevice(m_PhysicalDevice);
 
@@ -3556,7 +3734,7 @@ VulkanApp::~VulkanApp()
         vkDestroyFence(m_Device, m_ImagesInFlight[i], nullptr);
     }
 
-    for (auto& fence : m_SwapChainFences)
+    for (auto &fence: m_SwapChainFences)
         vkDestroyFence(m_Device, fence, nullptr);
 
     destroyTexture(m_EnvironmentMap);
@@ -3645,6 +3823,10 @@ VulkanApp::~VulkanApp()
     vkFreeMemory(m_Device, m_IndexBufferMemory, nullptr);
 
     vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
+
+    vkDestroyCommandPool(m_Device, m_SkyboxCommandPool, nullptr);
+
+    vkDestroyCommandPool(m_Device, m_SphereCommandPool, nullptr);
 
     vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
 

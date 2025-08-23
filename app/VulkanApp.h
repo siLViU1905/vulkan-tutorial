@@ -237,6 +237,12 @@ class VulkanApp
 
     Camera* m_Camera;
 
+    VkCommandPool m_SkyboxCommandPool;
+
+    VkCommandPool m_SphereCommandPool;
+
+    std::vector<VkCommandBuffer> m_SecondaryCommandBuffers;
+
     //methods
     void enumerateAvailableExtensions();
 
@@ -426,6 +432,14 @@ class VulkanApp
     void cleanupBRDFLUTResources();
 
     void destroyTexture(Texture& texture);
+
+    void createCommandPoolsForAsync();
+
+    void recordSkyboxCommands(VkCommandBuffer secondaryBuffer);
+
+    void recordSphereCommands(VkCommandBuffer secondaryBuffer);
+
+    void recordImGuiCommands(VkCommandBuffer secondaryBuffer);
 
 public:
     VulkanApp();
