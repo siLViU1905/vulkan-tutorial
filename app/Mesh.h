@@ -10,9 +10,7 @@ class Mesh
 public:
     Mesh();
 
-    std::vector<Vertex> vertices;
-
-    std::vector<uint32_t> indices;
+    Mesh(VkDevice& device, VkQueue& graphicsQueue, VkCommandPool& commandPool, VkPhysicalDevice& physicalDevice);
 
     void load(const std::string &path);
 
@@ -47,6 +45,32 @@ public:
 
     constexpr const auto &getModel() const { return m_Model; }
 
+    constexpr const auto& getVertices() const {return m_Vertices;}
+
+    constexpr const auto& getIndices() const {return m_Indices;}
+
+    constexpr const VkBuffer& getVertexBuffer() const{return m_VertexBuffer;}
+
+    constexpr const VkBuffer& getIndexBuffer() const{return m_IndexBuffer;}
+
+    void setDevice(VkDevice& device);
+
+    void setGraphicsQueue(VkQueue& graphicsQueue);
+
+    void setCommandPool(VkCommandPool& commandPool);
+
+    void setPhysicalDevice(VkPhysicalDevice& physicalDevice);
+
+    void setVertices(const std::vector<Vertex>& vertices);
+
+    void setIndices(const std::vector<uint32_t>& indices);
+
+    void createBuffers();
+
+    void cleanBuffers();
+
+    ~Mesh();
+
     glm::vec3 m_Color;
 
 private:
@@ -60,9 +84,34 @@ private:
 
     glm::mat4 m_Model;
 
+    std::vector<Vertex> m_Vertices;
+
+    std::vector<uint32_t> m_Indices;
+
     //std::unordered_map<Vertex, uint32_t> m_UniqueVertices;
 
     void updateModel();
-};
 
+    VkBuffer m_VertexBuffer;
+
+    VkDeviceMemory m_VertexBufferMemory;
+
+    VkBuffer m_IndexBuffer;
+
+    VkDeviceMemory m_IndexBufferMemory;
+
+    bool m_BuffersCreated;
+
+    VkDevice* device;
+
+     VkQueue* graphicsQueue;
+
+     VkCommandPool* commandPool;
+
+    VkPhysicalDevice* physicalDevice;
+
+    void createVertexBuffer();
+
+    void createIndexBuffer();
+};
 #endif //MESH_H

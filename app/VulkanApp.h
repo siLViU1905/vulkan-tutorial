@@ -119,7 +119,9 @@ class VulkanApp
 
     std::vector<VkSemaphore> m_RenderFinishedSemaphores;
 
-    std::vector<VkFence> m_InFlightFences;
+    std::vector<VkFence> m_ImagesInFlight;
+
+    std::vector<VkFence> m_SwapChainFences;
 
     uint32_t currentFrame;
 

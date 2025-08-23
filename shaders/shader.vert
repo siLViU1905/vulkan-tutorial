@@ -24,6 +24,7 @@ layout(binding = 0) uniform MVP
 }
 mvp;
 
+
 void main()
 {
     fragColor = mvp.color;
@@ -49,6 +50,7 @@ void main()
     viewPos = invView[3].xyz;
 
     fragPos = vec3(mvp.model * vec4(aPos, 1.0));
+
 
     gl_Position = mvp.projection * mvp.view * vec4(fragPos, 1.0);
 }

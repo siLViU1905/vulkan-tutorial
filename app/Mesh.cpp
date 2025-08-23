@@ -2,8 +2,19 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../include/tiny_obj_loader.h"
 #include "../include/glm/ext/matrix_transform.hpp"
+#include "Utility.h"
 
-Mesh::Mesh()
+Mesh::Mesh(): device(nullptr), graphicsQueue(nullptr), commandPool(nullptr), physicalDevice(nullptr), m_BuffersCreated(false)
+{
+    m_Position = m_Rotation = glm::vec3(0.f);
+
+    m_Color = m_Scale = glm::vec3(1.f);
+
+    m_Model = glm::mat4(1.f);
+}
+
+Mesh::Mesh(VkDevice &device, VkQueue &graphicsQueue, VkCommandPool &commandPool, VkPhysicalDevice& physicalDevice): device(&device),
+    graphicsQueue(&graphicsQueue), commandPool(&commandPool), physicalDevice(&physicalDevice), m_BuffersCreated(false)
 {
     m_Position = m_Rotation = glm::vec3(0.f);
 
@@ -51,20 +62,22 @@ void Mesh::load(const std::string &path)
 
             vertex.color = {1.0f, 1.0f, 1.0f};
 
-            vertices.push_back(vertex);
+            m_Vertices.push_back(vertex);
 
 
-            indices.push_back(indices.size());
+            m_Indices.push_back(m_Indices.size());
         }
 
     calculateTangents();
+
+    createBuffers();
 }
 
 void Mesh::generateSphere(float radius, int stacks, int slices)
 {
-    vertices.clear();
+    m_Vertices.clear();
 
-    indices.clear();
+    m_Indices.clear();
 
     for (int i = 0; i <= stacks; ++i)
     {
@@ -104,7 +117,7 @@ void Mesh::generateSphere(float radius, int stacks, int slices)
             vertex.tangent = tangent;
             vertex.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-            vertices.push_back(vertex);
+            m_Vertices.push_back(vertex);
         }
     }
 
@@ -115,15 +128,17 @@ void Mesh::generateSphere(float radius, int stacks, int slices)
             int first = i * (slices + 1) + j;
             int second = first + slices + 1;
 
-            indices.push_back(first);
-            indices.push_back(first + 1);
-            indices.push_back(second);
+            m_Indices.push_back(first);
+            m_Indices.push_back(first + 1);
+            m_Indices.push_back(second);
 
-            indices.push_back(second);
-            indices.push_back(first + 1);
-            indices.push_back(second + 1);
+            m_Indices.push_back(second);
+            m_Indices.push_back(first + 1);
+            m_Indices.push_back(second + 1);
         }
     }
+
+    createBuffers();
 }
 
 void Mesh::move(const glm::vec3 &offset)
@@ -168,6 +183,65 @@ void Mesh::setScale(const glm::vec3 &scale)
     updateModel();
 }
 
+void Mesh::setDevice(VkDevice &device)
+{
+    this->device = &device;
+}
+
+void Mesh::setGraphicsQueue(VkQueue &graphicsQueue)
+{
+    this->graphicsQueue = &graphicsQueue;
+}
+
+void Mesh::setCommandPool(VkCommandPool &commandPool)
+{
+    this->commandPool = &commandPool;
+}
+
+void Mesh::setPhysicalDevice(VkPhysicalDevice& physicalDevice)
+{
+    this->physicalDevice = &physicalDevice;
+}
+
+void Mesh::setVertices(const std::vector<Vertex> &vertices)
+{
+    m_Vertices.clear();
+
+    m_Vertices = vertices;
+}
+
+void Mesh::setIndices(const std::vector<uint32_t> &indices)
+{
+    m_Indices.clear();
+
+    m_Indices = indices;
+}
+
+void Mesh::createBuffers()
+{
+    createVertexBuffer();
+
+    createIndexBuffer();
+
+    m_BuffersCreated = true;
+}
+
+void Mesh::cleanBuffers()
+{
+    if (!m_BuffersCreated)
+        return;
+
+    m_BuffersCreated = false;
+
+    vkDestroyBuffer(*device, m_VertexBuffer, nullptr);
+
+    vkFreeMemory(*device, m_VertexBufferMemory, nullptr);
+
+    vkDestroyBuffer(*device, m_IndexBuffer, nullptr);
+
+    vkFreeMemory(*device, m_IndexBufferMemory, nullptr);
+}
+
 void Mesh::updateModel()
 {
     m_Model = glm::mat4(1.f);
@@ -183,20 +257,92 @@ void Mesh::updateModel()
     m_Model = glm::scale(m_Model, m_Scale);
 }
 
+void Mesh::createVertexBuffer()
+{
+    if (m_Vertices.empty())
+        throw std::runtime_error("Vertices are empty");
+
+    VkDeviceSize bufferSize = sizeof(m_Vertices[0]) * m_Vertices.size();
+
+    VkBuffer stagingBuffer;
+
+    VkDeviceMemory stagingBufferMemory;
+
+    vkutl::createBuffer(*physicalDevice, *device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    void* data;
+
+    vkMapMemory(*device, stagingBufferMemory, 0, bufferSize, 0, &data);
+
+    memcpy(data, m_Vertices.data(), bufferSize);
+
+    vkUnmapMemory(*device, stagingBufferMemory);
+
+    vkutl::createBuffer(*physicalDevice, *device,
+    bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+             m_VertexBuffer, m_VertexBufferMemory);
+
+    vkutl::copyBuffer(*device, *graphicsQueue, *commandPool,
+        stagingBuffer, m_VertexBuffer, bufferSize);
+
+    vkDestroyBuffer(*device, stagingBuffer, nullptr);
+
+    vkFreeMemory(*device, stagingBufferMemory, nullptr);
+}
+
+void Mesh::createIndexBuffer()
+{
+    if (m_Indices.empty())
+        throw std::runtime_error("Indices are empty");
+
+    VkDeviceSize bufferSize = sizeof(m_Indices[0]) * m_Indices.size();
+
+    VkBuffer stagingBuffer;
+
+    VkDeviceMemory stagingBufferMemory;
+
+    vkutl::createBuffer(*physicalDevice, *device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    void* data;
+
+    vkMapMemory(*device, stagingBufferMemory, 0, bufferSize, 0, &data);
+
+    memcpy(data, m_Indices.data(), bufferSize);
+
+    vkUnmapMemory(*device, stagingBufferMemory);
+
+    vkutl::createBuffer(*physicalDevice, *device,
+   bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            m_IndexBuffer, m_IndexBufferMemory);
+
+    vkutl::copyBuffer(*device, *graphicsQueue, *commandPool,
+       stagingBuffer, m_IndexBuffer, bufferSize);
+
+    vkDestroyBuffer(*device, stagingBuffer, nullptr);
+
+    vkFreeMemory(*device, stagingBufferMemory, nullptr);
+}
+
 void Mesh::calculateTangents()
 {
-    for (auto &vertex: vertices)
+    for (auto &vertex: m_Vertices)
         vertex.tangent = glm::vec3(0.f);
 
-    for (size_t i = 0; i < indices.size(); i += 3)
+    for (size_t i = 0; i < m_Indices.size(); i += 3)
     {
-        uint32_t i0 = indices[i];
-        uint32_t i1 = indices[i + 1];
-        uint32_t i2 = indices[i + 2];
+        uint32_t i0 = m_Indices[i];
+        uint32_t i1 = m_Indices[i + 1];
+        uint32_t i2 = m_Indices[i + 2];
 
-        Vertex &v0 = vertices[i0];
-        Vertex &v1 = vertices[i1];
-        Vertex &v2 = vertices[i2];
+        Vertex &v0 = m_Vertices[i0];
+        Vertex &v1 = m_Vertices[i1];
+        Vertex &v2 = m_Vertices[i2];
 
         glm::vec3 edge1 = v1.position - v0.position;
         glm::vec3 edge2 = v2.position - v0.position;
@@ -216,7 +362,7 @@ void Mesh::calculateTangents()
         v2.tangent += tangent;
     }
 
-    for (auto &vertex: vertices)
+    for (auto &vertex: m_Vertices)
     {
         if (glm::length(vertex.tangent) > 0.0001f)
         {
@@ -231,4 +377,9 @@ void Mesh::calculateTangents()
             }
         }
     }
+}
+
+Mesh::~Mesh()
+{
+    cleanBuffers();
 }
