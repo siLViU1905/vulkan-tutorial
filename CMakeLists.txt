@@ -7,10 +7,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(VULKAN_SDK "C:/VulkanSDK/1.4.321.1")
 set(Vulkan_ROOT "${VULKAN_SDK}")
 
-set(GLFW_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+set(GLFW_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include/GLFW")
+
+set(ASSIMP_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include/assimp")
 
 if (MSVC)
     set(GLFW_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/lib/glfw3.lib")
+    set(ASSIMP_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/lib/assimp-vc143-mtd.lib")
 elseif (MINGW OR CMAKE_COMPILER_IS_GNUCXX)
     set(GLFW_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/lib/libglfw3.a")
 endif ()
@@ -38,7 +41,10 @@ add_executable(vulkan
         app/Utility.cpp
 )
 
+target_include_directories(vulkan PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
 target_link_libraries(vulkan
         Vulkan::Vulkan
         ${GLFW_LIBRARIES}
+        ${ASSIMP_LIBRARIES}
 )

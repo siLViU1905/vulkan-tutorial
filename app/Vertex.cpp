@@ -1,5 +1,9 @@
 #include "Vertex.h"
 
+Vertex::Vertex(): m_Position(0.f), m_Normal(0.f), m_TexCoords(0.f), m_Tangent(0.f)
+{
+}
+
 VkVertexInputBindingDescription Vertex::getBindingDescription()
 {
     VkVertexInputBindingDescription bindingDescription{};

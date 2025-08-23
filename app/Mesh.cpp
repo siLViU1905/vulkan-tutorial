@@ -4,7 +4,8 @@
 #include "../include/glm/ext/matrix_transform.hpp"
 #include "Utility.h"
 
-Mesh::Mesh(): device(nullptr), graphicsQueue(nullptr), commandPool(nullptr), physicalDevice(nullptr), m_BuffersCreated(false)
+Mesh::Mesh(): device(nullptr), graphicsQueue(nullptr), commandPool(nullptr), physicalDevice(nullptr),
+              m_BuffersCreated(false)
 {
     m_Position = m_Rotation = glm::vec3(0.f);
 
@@ -13,8 +14,10 @@ Mesh::Mesh(): device(nullptr), graphicsQueue(nullptr), commandPool(nullptr), phy
     m_Model = glm::mat4(1.f);
 }
 
-Mesh::Mesh(VkDevice &device, VkQueue &graphicsQueue, VkCommandPool &commandPool, VkPhysicalDevice& physicalDevice): device(&device),
-    graphicsQueue(&graphicsQueue), commandPool(&commandPool), physicalDevice(&physicalDevice), m_BuffersCreated(false)
+Mesh::Mesh(VkDevice &device, VkQueue &graphicsQueue, VkCommandPool &commandPool,
+           VkPhysicalDevice &physicalDevice): device(&device),
+                                              graphicsQueue(&graphicsQueue), commandPool(&commandPool),
+                                              physicalDevice(&physicalDevice), m_BuffersCreated(false)
 {
     m_Position = m_Rotation = glm::vec3(0.f);
 
@@ -25,51 +28,20 @@ Mesh::Mesh(VkDevice &device, VkQueue &graphicsQueue, VkCommandPool &commandPool,
 
 void Mesh::load(const std::string &path)
 {
-    tinyobj::attrib_t attrib;
+    Assimp::Importer import;
 
-    std::vector<tinyobj::shape_t> shapes;
+    const aiScene* scene = import.ReadFile(
+        path.c_str(),
+        aiProcess_Triangulate | aiProcess_GenSmoothNormals |
+        aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 
-    std::vector<tinyobj::material_t> materials;
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
+        !scene->mRootNode)
+        throw std::runtime_error("Failed to load model");
 
-    std::string warn, err;
+    processNode(scene->mRootNode, scene);
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str()))
-        throw std::runtime_error(err);
-
-    for (const auto &shape: shapes)
-        for (const auto &index: shape.mesh.indices)
-        {
-            Vertex vertex;
-
-            vertex.m_Position = {
-                attrib.vertices[3 * index.vertex_index],
-                attrib.vertices[3 * index.vertex_index + 1],
-                attrib.vertices[3 * index.vertex_index + 2]
-            };
-
-            vertex.m_TexCoords = {
-                attrib.texcoords[2 * index.texcoord_index],
-                attrib.texcoords[2 * index.texcoord_index + 1]
-            };
-
-            if (index.normal_index >= 0 && !attrib.normals.empty())
-                vertex.m_Normal = {
-                    attrib.normals[3 * index.normal_index],
-                    attrib.normals[3 * index.normal_index + 1],
-                    attrib.normals[3 * index.normal_index + 2]
-                };
-
-
-           if (!m_UniqueVertices.contains(vertex))
-           {
-               m_UniqueVertices[vertex] = static_cast<uint32_t>(m_Vertices.size());
-               m_Vertices.push_back(vertex);
-           }
-
-            m_Indices.push_back(m_UniqueVertices[vertex]);
-        }
-
-    calculateTangents();
+    m_UniqueVertices.clear();
 
     createBuffers();
 }
@@ -198,7 +170,7 @@ void Mesh::setCommandPool(VkCommandPool &commandPool)
     this->commandPool = &commandPool;
 }
 
-void Mesh::setPhysicalDevice(VkPhysicalDevice& physicalDevice)
+void Mesh::setPhysicalDevice(VkPhysicalDevice &physicalDevice)
 {
     this->physicalDevice = &physicalDevice;
 }
@@ -269,10 +241,10 @@ void Mesh::createVertexBuffer()
     VkDeviceMemory stagingBufferMemory;
 
     vkutl::createBuffer(*physicalDevice, *device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer, stagingBufferMemory);
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        stagingBuffer, stagingBufferMemory);
 
-    void* data;
+    void *data;
 
     vkMapMemory(*device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
@@ -281,12 +253,12 @@ void Mesh::createVertexBuffer()
     vkUnmapMemory(*device, stagingBufferMemory);
 
     vkutl::createBuffer(*physicalDevice, *device,
-    bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-             m_VertexBuffer, m_VertexBufferMemory);
+                        bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                        m_VertexBuffer, m_VertexBufferMemory);
 
     vkutl::copyBuffer(*device, *graphicsQueue, *commandPool,
-        stagingBuffer, m_VertexBuffer, bufferSize);
+                      stagingBuffer, m_VertexBuffer, bufferSize);
 
     vkDestroyBuffer(*device, stagingBuffer, nullptr);
 
@@ -305,10 +277,10 @@ void Mesh::createIndexBuffer()
     VkDeviceMemory stagingBufferMemory;
 
     vkutl::createBuffer(*physicalDevice, *device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer, stagingBufferMemory);
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        stagingBuffer, stagingBufferMemory);
 
-    void* data;
+    void *data;
 
     vkMapMemory(*device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
@@ -317,16 +289,73 @@ void Mesh::createIndexBuffer()
     vkUnmapMemory(*device, stagingBufferMemory);
 
     vkutl::createBuffer(*physicalDevice, *device,
-   bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            m_IndexBuffer, m_IndexBufferMemory);
+                        bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                        m_IndexBuffer, m_IndexBufferMemory);
 
     vkutl::copyBuffer(*device, *graphicsQueue, *commandPool,
-       stagingBuffer, m_IndexBuffer, bufferSize);
+                      stagingBuffer, m_IndexBuffer, bufferSize);
 
     vkDestroyBuffer(*device, stagingBuffer, nullptr);
 
     vkFreeMemory(*device, stagingBufferMemory, nullptr);
+}
+
+void Mesh::processNode(aiNode *node, const aiScene *scene)
+{
+    for (uint32_t i = 0; i < node->mNumMeshes; ++i)
+    {
+        aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+
+        processMesh(mesh, scene);
+    }
+
+    for (uint32_t i = 0; i < node->mNumChildren; ++i)
+        processNode(node->mChildren[i], scene);
+}
+
+void Mesh::processMesh(aiMesh *mesh, const aiScene *scene)
+{
+    for (uint32_t i = 0; i < mesh->mNumFaces; ++i)
+    {
+        const aiFace& face = mesh->mFaces[i];
+
+        for (uint32_t j = 0; j < face.mNumIndices; ++j)
+        {
+            uint32_t vertexIndex = face.mIndices[j];
+
+            Vertex vertex;
+
+            vertex.m_Position = glm::vec3(mesh->mVertices[vertexIndex].x,
+                                          mesh->mVertices[vertexIndex].y,
+                                          mesh->mVertices[vertexIndex].z);
+
+            if (mesh->HasNormals())
+                vertex.m_Normal = glm::vec3(mesh->mNormals[vertexIndex].x,
+                                            mesh->mNormals[vertexIndex].y,
+                                            mesh->mNormals[vertexIndex].z);
+
+
+            if (mesh->mTextureCoords[0])
+                vertex.m_TexCoords = glm::vec2(mesh->mTextureCoords[0][vertexIndex].x,
+                                               mesh->mTextureCoords[0][vertexIndex].y);
+
+
+            if (mesh->HasTangentsAndBitangents()) {
+                vertex.m_Tangent = glm::vec3(mesh->mTangents[vertexIndex].x,
+                                             mesh->mTangents[vertexIndex].y,
+                                             mesh->mTangents[vertexIndex].z);
+            }
+
+            if (!m_UniqueVertices.contains(vertex))
+            {
+                m_UniqueVertices[vertex] = static_cast<uint32_t>(m_Vertices.size());
+                m_Vertices.push_back(vertex);
+            }
+
+            m_Indices.push_back(m_UniqueVertices[vertex]);
+        }
+    }
 }
 
 void Mesh::calculateTangents()
@@ -366,7 +395,8 @@ void Mesh::calculateTangents()
     {
         if (glm::length(vertex.m_Tangent) > 0.0001f)
         {
-            vertex.m_Tangent = glm::normalize(vertex.m_Tangent - vertex.m_Normal * glm::dot(vertex.m_Normal, vertex.m_Tangent));
+            vertex.m_Tangent = glm::normalize(
+                vertex.m_Tangent - vertex.m_Normal * glm::dot(vertex.m_Normal, vertex.m_Tangent));
         } else
         {
             glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);

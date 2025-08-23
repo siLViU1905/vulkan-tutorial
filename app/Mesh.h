@@ -4,6 +4,10 @@
 #include <vector>
 
 #include "Vertex.h"
+#include "../include/assimp/Importer.hpp"
+#include "../include/assimp/postprocess.h"
+#include "../include/assimp/scene.h"
+
 
 class Mesh
 {
@@ -113,5 +117,9 @@ private:
     void createVertexBuffer();
 
     void createIndexBuffer();
+
+    void processNode(aiNode* node, const aiScene* scene);
+
+    void processMesh(aiMesh* mesh, const aiScene* scene);
 };
 #endif //MESH_H
