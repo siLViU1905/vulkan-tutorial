@@ -52,6 +52,11 @@ void VulkanApp::framebufferCallback(GLFWwindow *window, int width, int height)
     WINDOW_RESIZED = true;
 }
 
+void VulkanApp::keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
+{
+
+}
+
 bool VulkanApp::QueueFamilyIndices::isComplete()
 {
     return graphicsFamily.has_value() && presentFamily.has_value();
@@ -966,40 +971,9 @@ void VulkanApp::drawFrame()
 
     updateSphereUniformBuffer(currentFrame);
 
-    /*if (!m_SecondaryCommandBuffers.empty())
-    {
-        vkFreeCommandBuffers(m_Device, m_SkyboxCommandPool, 1, &m_SecondaryCommandBuffers[0]);
-        vkFreeCommandBuffers(m_Device, m_SphereCommandPool, 1, &m_SecondaryCommandBuffers[1]);
-        vkFreeCommandBuffers(m_Device, m_CommandPool, 1, &m_SecondaryCommandBuffers[2]);
-        m_SecondaryCommandBuffers.clear();
-    }*/
-
     vkResetCommandPool(m_Device, m_SkyboxCommandPool, 0);
     vkResetCommandPool(m_Device, m_SphereCommandPool, 0);
     vkResetCommandPool(m_Device, m_CommandPool, 0);
-
-    m_SecondaryCommandBuffers.resize(3);
-
-    VkCommandBufferAllocateInfo allocInfo{};
-
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-    allocInfo.commandBufferCount = 1;
-
-    allocInfo.commandPool = m_SkyboxCommandPool;
-
-    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[0]))
-        throw std::runtime_error("Failed to allocate secondary command buffer for skybox");
-
-    allocInfo.commandPool = m_SphereCommandPool;
-
-    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[1]))
-        throw std::runtime_error("Failed to allocate secondary command buffer for sphere");
-
-    allocInfo.commandPool = m_CommandPool;
-
-    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[2]))
-        throw std::runtime_error("Failed to allocate secondary command buffer for ImGui");
 
     std::thread skyboxThread(&VulkanApp::recordSkyboxCommands, this, m_SecondaryCommandBuffers[0]);
     std::thread sphereThread(&VulkanApp::recordSphereCommands, this, m_SecondaryCommandBuffers[1]);
@@ -3558,6 +3532,8 @@ VulkanApp::VulkanApp()
 
     glfwSetFramebufferSizeCallback(m_Window, framebufferCallback);
 
+    glfwSetKeyCallback(m_Window, keyCallback);
+
     m_Camera = new Camera(m_Window, glm::vec3(0.f, 5.f, 0.f), 5.f);
 
     enumerateAvailableExtensions();
@@ -3683,6 +3659,26 @@ VulkanApp::VulkanApp()
 
     if (!ImGui_ImplVulkan_Init(&initInfo))
         throw std::runtime_error("Failed to initialize ImGui");
+
+    m_SecondaryCommandBuffers.resize(3);
+
+    VkCommandBufferAllocateInfo allocInfo{};
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+    allocInfo.commandBufferCount = 1;
+
+    allocInfo.commandPool = m_SkyboxCommandPool;
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[0]))
+        throw std::runtime_error("Failed to allocate secondary command buffer for skybox");
+
+    allocInfo.commandPool = m_SphereCommandPool;
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[1]))
+        throw std::runtime_error("Failed to allocate secondary command buffer for sphere");
+
+    allocInfo.commandPool = m_CommandPool;
+    if (vkAllocateCommandBuffers(m_Device, &allocInfo, &m_SecondaryCommandBuffers[2]))
+        throw std::runtime_error("Failed to allocate secondary command buffer for ImGui");
 }
 
 void VulkanApp::run()
@@ -3800,27 +3796,7 @@ VulkanApp::~VulkanApp()
 
     vkDestroyDescriptorSetLayout(m_Device, m_DescriptorSetLayout, nullptr);
 
-    vkDestroyBuffer(m_Device, m_SphereVertexBuffer, nullptr);
-
-    vkFreeMemory(m_Device, m_SphereVertexBufferMemory, nullptr);
-
-    vkDestroyBuffer(m_Device, m_SphereIndexBuffer, nullptr);
-
-    vkFreeMemory(m_Device, m_SphereIndexBufferMemory, nullptr);
-
-    vkDestroyBuffer(m_Device, m_SkyboxVertexBuffer, nullptr);
-
-    vkFreeMemory(m_Device, m_SkyboxVertexBufferMemory, nullptr);
-
     vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
-
-    vkDestroyBuffer(m_Device, m_VertexBuffer, nullptr);
-
-    vkFreeMemory(m_Device, m_VertexBufferMemory, nullptr);
-
-    vkDestroyBuffer(m_Device, m_IndexBuffer, nullptr);
-
-    vkFreeMemory(m_Device, m_IndexBufferMemory, nullptr);
 
     vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 

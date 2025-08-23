@@ -28,9 +28,13 @@
 class VulkanApp
 {
     //static members
-    static constexpr int WINDOW_WIDTH = 800;
+    inline static int WINDOW_WIDTH = 800;
 
-    static constexpr int WINDOW_HEIGHT = 600;
+    inline static int WINDOW_HEIGHT = 600;
+
+    inline static int WINDOW_XPOS = 100;
+
+    inline static int WINDOW_YPOS = 100;
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -55,6 +59,8 @@ class VulkanApp
     static auto readFile(const std::string &path);
 
     static void framebufferCallback(GLFWwindow *window, int width, int height);
+
+    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 
     //structs
